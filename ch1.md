@@ -74,6 +74,26 @@ os:     file format elf64-littleriscv
 
 之后`cargo objdump -- -S`，发现有指令，但是链接到的地址不对，需要自己写链接脚本，为了让rustc能使用我们自己编写的链接脚本，需要给他传参数，[rustc Command-line Arguments](https://doc.rust-lang.org/beta/rustc/command-line-arguments.html#command-line-arguments) ，然后由于是cargo托管编译，所以需要还需要改cargo的config.toml
 
+之后使用qemu，并使用gdb远程连接做调试
+
+## 为内核支持函数调用（即创造boot stack）
+
+感觉看还是学到了一些东西的
+
+函数调用约定，即calling convention，是ISA和编程语言共同决定的，比如说RV64+C是一套calling convention，而RV64+Rust又是另一套，然后在Rust中写extern "C"，实际上是告诉编译器，这个函数是用C的ABI，但是看起来我搜了一下，Rust中的calling convention是unstable的，是internal的
+
+函数约定主要规范了
+
+- 各种寄存器在函数调用时的用途
+
+- 寄存器被谁保存
+
+rCore选择将内核的启动栈帧放到.bss段里面，但是不对其做初始化
+
+之后其实直接设置好sp就可以直接跳到rust code里面了其实，毕竟写rust总比写asm要好
+
+在rust code中需要做一个清空bss段的操作，最主要的是利用了rust的两个特性，[Accessing or Modifying a Mutable Static Variable](https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html?highlight=static#accessing-or-modifying-a-mutable-static-variable) rust中的statice var就是常说的全局变量和[Dereferencing a Raw Pointer](https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html?highlight=static#dereferencing-a-raw-pointer) 来直接操作内存地址，都是rust unsafe部分
+
 [^1]: rustup是The Rust tool chain installer
 
 [^2]: [Attributes](https://dhghomon.github.io/easy_rust/Chapter_52.html#attributes)其可以控制编译器的一些行为，使用#控制下一个语句，而#!控制整个文件

@@ -15,9 +15,13 @@ BOARD := qemu
 SBI ?= rustsbi
 BOOTLOADER := ./bootloader/$(SBI)-$(BOARD).bin
 
+# Kernel
+KERNEL_ENTRY_PA := 0x80200000
+
 # Binutils
 OBJDUMP := rust-objdump --arch-name=riscv64
 OBJCOPY := rust-objcopy --binary-architecture=riscv64
+GDB := riscv64-none-elf-gdb
 
 #Qemu
 QEMU_ARGS := -machine virt \
@@ -44,7 +48,7 @@ clean:
 
 .PHONY: disasm
 disasm: build
-	@$(OBJDUMP) -x $(KERNEL_ELF)
+	@$(OBJDUMP) -S $(KERNEL_ELF)
 
 .PHONY: run
 run: build
@@ -52,7 +56,10 @@ run: build
 
 .PHONY: gdbserver gdbclient
 gdbserver: build
-	@qemu-system-riscv64 $(QEMU_ARGS) -s -S
+	qemu-system-riscv64 $(QEMU_ARGS) -s -S
 
 gdbclient:
-	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_ELF)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
+	$(GDB) \
+	-ex 'file $(KERNEL_ELF)' \
+	-ex 'set arch riscv:rv64' \
+	-ex 'target remote localhost:1234'
