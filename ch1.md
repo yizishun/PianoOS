@@ -68,6 +68,12 @@ os:     file format elf64-littleriscv
 
 然后qemu的启动流程也比较简单，首先0x80000000开始执行rustsbi,然后rustsbi约定好会跳到0x80200000处开始执行kernel，然后由于暂时rustsbi不执行加载工作，所以使用-device loader自动加载内核，但是其实我之前有一个不知道的一点，就是qemu会先到自己内部的一些代码，即0x1000，做一些工作之后再跳到0x80000000
 
+## 内核第一条指令（实践篇）
+
+首先编写第一条指令，即一个asm文件，然后使用`global_asm!(include_str!("entry.asm"));`导入，为此我还去学了一下rust的macro（macro主要处理source code,有两种macro,一种是匹配source code，做出相应处理，另一种是输出source code）
+
+之后`cargo objdump -- -S`，发现有指令，但是链接到的地址不对，需要自己写链接脚本，为了让rustc能使用我们自己编写的链接脚本，需要给他传参数，[rustc Command-line Arguments](https://doc.rust-lang.org/beta/rustc/command-line-arguments.html#command-line-arguments) ，然后由于是cargo托管编译，所以需要还需要改cargo的config.toml
+
 [^1]: rustup是The Rust tool chain installer
 
 [^2]: [Attributes](https://dhghomon.github.io/easy_rust/Chapter_52.html#attributes)其可以控制编译器的一些行为，使用#控制下一个语句，而#!控制整个文件
