@@ -1,0 +1,73 @@
+# CH1 应用程序与基本执行环境
+
+## 
+
+## 应用程序执行环境与平台支持
+
+首先我第一次知道三元组的概念，比如
+
+> `x86_64-unknown-linux-gnu`，其中 CPU 架构是 x86_64，CPU 厂商是 unknown，操作系统是 linux，运行时库是 GNU libc
+> 
+> `riscv64gc-unknown-none-elf` 目标平台。这其中的 CPU 架构是 riscv64gc ，CPU厂商是 unknown ，操作系统是 none ， elf 表示没有标准的运行时库（表明没有任何系统调用的封装支持），但可以生成 ELF 格式的执行程序
+
+即是 `CPU架构-CPU厂商-操作系统-运行时库`这样的划分
+
+然后rust的std库需要依赖操作系统，但是core库不需要依赖操作系统，所以第一步应该是移植到core库上
+
+## 移除标准库依赖
+
+### 安装rust toolchains
+
+首先根据教程`rustup target add riscv64gc-unknown-none-elf` 首先通过rustup [^1] 安装这个平台的toolchains，这其实就类似于c里面安装riscv64-unknown-elf-gcc一样，然后修改cargo的配置，让其对于这个package使用这个toolchains，需要用.cargo/config.toml文件
+
+### 使用Core而不是Std
+
+但是现在依然会报错，因为rust编译器依然会默认从std中拿println的实现，所以需要使用Attributes [^2]来告诉编译器，即使用`#![no_std]` 
+
+*(在vscode中使用no_std时rust-analyzer会出现问题，详见 [issue](https://github.com/rust-lang/rust-analyzer/issues/3297))*
+
+ *(在vscode中使用rust-analyzer pre-release版本的时候，checkOnSave选项被改成check,上述issue中的名称需要改变)*
+
+### 提供默认的Panic实现
+
+由于在core中没有提供对panic的默认实现（估计是panic的实现需要打印内容，但是他不知道怎么使用当前os的syscall），所以我们需要给一个默认实现
+
+使用`#[panic_handler]`来标记一个具有`fn(&PanicInfo) -> !`函数签名的函数，即可为编译器提供实现，此时使用loop来做一个简单实现
+
+### 移除 main 函数
+
+main函数也需要std,没有std的我们只能自己定义__start，所以先使用`#![no_main]`然后编译
+
+### 分析
+
+有一个轮椅项目，[cargo-binutils](https://crates.io/crates/cargo-binutils)他是相当于llvm的那些tool的proxy，但是他和cargo联系的比较紧密，他能有两种用法，一个是类似与`rust-$tool ${args[@]}`一个是直接用cargo,例子为`cargo objdump --release -- --disassemble --no-show-raw-insn` 
+
+```shell
+> cargo objdump -- -S 
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+
+os:     file format elf64-littleriscv
+```
+
+发现是一个空程序
+
+## 内核第一条指令（基础篇）
+
+### qemu-system-riscv64
+
+像是verilator模拟fpga之类的一样，qemu也在模拟真实的计算机板卡，（甚至已经预料到操作系统比赛前期疯狂用qemu,然后上板出问题了，有阴影了属于是），是前期开发必不可少的重要工具
+
+然后先了解他的几个重要选项
+
+```shell
+-M/--machine： 选择模拟的board，包括CPU,SoC,板上资源。一般选择virt，而且不同板子在rv上差异较大
+-bios：CPU的firmware/bootloader。一般选择rustsbi,默认是opensbi
+-nographic：表示模拟器不需要提供图形界面，而只需要对外输出字符流。
+-device loader：使用loader这个奇怪的device能直接让qemu帮忙将某个bin文件做加载到某个特定地址
+```
+
+然后qemu的启动流程也比较简单，首先0x80000000开始执行rustsbi,然后rustsbi约定好会跳到0x80200000处开始执行kernel，然后由于暂时rustsbi不执行加载工作，所以使用-device loader自动加载内核，但是其实我之前有一个不知道的一点，就是qemu会先到自己内部的一些代码，即0x1000，做一些工作之后再跳到0x80000000
+
+[^1]: rustup是The Rust tool chain installer
+
+[^2]: [Attributes](https://dhghomon.github.io/easy_rust/Chapter_52.html#attributes)其可以控制编译器的一些行为，使用#控制下一个语句，而#!控制整个文件
