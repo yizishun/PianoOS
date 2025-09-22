@@ -4,13 +4,16 @@
 use core::arch::global_asm;
 
 mod lang_items;
+mod sbi;
+mod console;
 
 global_asm!(include_str!("entry.asm"));
 
 #[unsafe(no_mangle)]
 pub fn rust_main() -> !{
     clear_bss();
-    loop {};
+    sbi::console_putchar(60);
+    sbi::shutdown(false);
 }
 
 fn clear_bss() {

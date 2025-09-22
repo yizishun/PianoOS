@@ -94,6 +94,30 @@ rCore选择将内核的启动栈帧放到.bss段里面，但是不对其做初�
 
 在rust code中需要做一个清空bss段的操作，最主要的是利用了rust的两个特性，[Accessing or Modifying a Mutable Static Variable](https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html?highlight=static#accessing-or-modifying-a-mutable-static-variable) rust中的statice var就是常说的全局变量和[Dereferencing a Raw Pointer](https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html?highlight=static#dereferencing-a-raw-pointer) 来直接操作内存地址，都是rust unsafe部分
 
+## 基于 SBI 服务完成输出和关机
+
+为此，去看了一眼SBI的[Spec](https://github.com/riscv-non-isa/riscv-sbi-doc)，sbi我认为最主要的意义就是让kernel变得更可移植了
+
+定义了一套m mode和s mode下的规范，狭义来讲就是calling convention，他们通过ecall进行控制转移，a6+a7传递需要调用的函数，a0-a5传参数，a0-a1返回值，也有extention系统
+
+看起来，文档上写的[sbi_rt](https://github.com/rustsbi/sbi-rt)已经停止维护了，我发现他被移到了rustsbi仓库中，我打算直接使用git来引用他，即`sbi-rt = { git = "https://github.com/rustsbi/rustsbi", package = "sbi-rt" }`，使用`cargo doc -p sbi-rt --open`可以本地打开他的doc，并且使用git的版本
+
+然后文档使用`console_putchar`但是他是deprecated的，但是其实sbi ch12已经有新的extention了，即`console_write_byte`
+
+```rust
+pub fn console_putchar(c: usize) {
+    c
+    .to_le_bytes()
+    .iter()
+    .for_each( |c_bytes| {
+            sbi_rt::console_write_byte(*c_bytes);
+        }
+    );
+}
+```
+
+
+
 [^1]: rustup是The Rust tool chain installer
 
 [^2]: [Attributes](https://dhghomon.github.io/easy_rust/Chapter_52.html#attributes)其可以控制编译器的一些行为，使用#控制下一个语句，而#!控制整个文件

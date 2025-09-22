@@ -5,3 +5,28 @@ version = 4
 [[package]]
 name = "PianoOS"
 version = "0.1.0"
+dependencies = [
+ "sbi-rt",
+]
+
+[[package]]
+name = "bitflags"
+version = "2.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2261d10cca569e4643e526d8dc2e62e433cc8aba21ab764233731f8d369bf394"
+
+[[package]]
+name = "sbi-rt"
+version = "0.0.3"
+source = "git+https://github.com/rustsbi/rustsbi#7754d4b33949141bef4da00f7ff74c75ea412f5c"
+dependencies = [
+ "sbi-spec",
+]
+
+[[package]]
+name = "sbi-spec"
+version = "0.0.8"
+source = "git+https://github.com/rustsbi/rustsbi#7754d4b33949141bef4da00f7ff74c75ea412f5c"
+dependencies = [
+ "bitflags",
+]
