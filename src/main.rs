@@ -12,7 +12,7 @@ global_asm!(include_str!("entry.asm"));
 #[unsafe(no_mangle)]
 pub fn rust_main() -> !{
     clear_bss();
-    sbi::console_putchar(60);
+    println!("Hello World");
     sbi::shutdown(false);
 }
 

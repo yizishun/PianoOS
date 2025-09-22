@@ -1,4 +1,4 @@
-pub fn console_putchar(c: usize) {
+pub fn console_putchar(c: usize) { //TODO: error handling
     c
     .to_le_bytes()
     .iter()
@@ -11,9 +11,9 @@ pub fn console_putchar(c: usize) {
 pub fn shutdown(fail: bool) -> !{
     use sbi_rt::{Shutdown, NoReason, SystemFailure};
     if fail {
-        sbi_rt::system_reset(Shutdown, NoReason);
-    }else {
         sbi_rt::system_reset(Shutdown, SystemFailure);
+    }else {
+        sbi_rt::system_reset(Shutdown, NoReason);
     }
     unreachable!()
 }

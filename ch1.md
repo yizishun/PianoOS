@@ -116,7 +116,18 @@ pub fn console_putchar(c: usize) {
 }
 ```
 
+然后来拆解一下这个macro
 
+```rust
+#[macro_export]
+macro_rules! print {
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        $crate::console::print(format_args!($fmt $(, $($arg)+)?));
+    }
+}
+```
+
+首先要了解format_args!宏，他应该是parse了一个patern,然后变成了一个`fmt::Arguments`类型，然后传给print，`fmt: literal (, (arg: tt)+)?`感觉就像是`"{} {}", 1, 2`这种pattern，所以感觉理解是啥意思没啥问题，但是让我写还是有些细节不太清楚
 
 [^1]: rustup是The Rust tool chain installer
 
