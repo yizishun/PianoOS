@@ -17,3 +17,25 @@ pub fn shutdown(fail: bool) -> !{
     }
     unreachable!()
 }
+
+pub fn sleep(sec: i32) {
+
+}
+
+#[macro_export]
+macro_rules! read_csr {
+    ($csrNum: expr) => {
+        {
+            use core::arch::asm;
+            let mut read_value: i64;
+            unsafe {
+                asm!(
+                    "csrr {0}, {1}",
+                    out(reg) read_value,
+                    const $csrNum
+                )
+            }
+            read_value
+        }
+    };
+}

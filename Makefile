@@ -1,6 +1,6 @@
 # Building
 TARGET := riscv64gc-unknown-none-elf
-MODE := release
+MODE := debug
 KERNEL_ELF := target/$(TARGET)/$(MODE)/PianoOS
 KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
@@ -62,4 +62,6 @@ gdbclient:
 	$(GDB) \
 	-ex 'file $(KERNEL_ELF)' \
 	-ex 'set arch riscv:rv64' \
-	-ex 'target remote localhost:1234'
+	-ex 'target remote localhost:1234' \
+	-ex 'layout asm' \
+	-tui

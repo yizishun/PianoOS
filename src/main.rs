@@ -12,7 +12,8 @@ global_asm!(include_str!("entry.asm"));
 #[unsafe(no_mangle)]
 pub fn rust_main() -> !{
     clear_bss();
-    println!("Hello World");
+    println!("stvec {}\n", read_csr!(0x105));
+    println!("Hello World\n");
     sbi::shutdown(false);
 }
 
