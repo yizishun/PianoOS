@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 sbi-rt = { git = "https://github.com/rustsbi/rustsbi", package = "sbi-rt"}
+riscv = { version = "0.15.0" }

@@ -2,6 +2,7 @@
 #![no_main]
 
 use core::arch::global_asm;
+use riscv::register::{stvec, mtvec};
 
 mod lang_items;
 mod sbi;
@@ -12,8 +13,9 @@ global_asm!(include_str!("entry.asm"));
 #[unsafe(no_mangle)]
 pub fn rust_main() -> !{
     clear_bss();
-    println!("stvec {}\n", read_csr!(0x105));
-    println!("Hello World\n");
+    let stvec_value= stvec::read().bits();
+    println!("mtvec = {}", stvec_value);
+    println!("Hello World");
     sbi::shutdown(false);
 }
 
