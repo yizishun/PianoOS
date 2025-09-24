@@ -2,7 +2,10 @@
 #![no_main]
 
 use core::arch::global_asm;
-use riscv::register::{stvec, mtvec};
+use riscv::register::{sie};
+
+use crate::sbi::sleep;
+const FREQUNCY: i32 = 10;
 
 mod lang_items;
 mod sbi;
@@ -13,9 +16,9 @@ global_asm!(include_str!("entry.asm"));
 #[unsafe(no_mangle)]
 pub fn rust_main() -> !{
     clear_bss();
-    let stvec_value= stvec::read().bits();
-    println!("mtvec = {}", stvec_value);
     println!("Hello World");
+    sleep(5);
+    println!("sie = {}", sie::read().bits());
     sbi::shutdown(false);
 }
 

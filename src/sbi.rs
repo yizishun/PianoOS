@@ -1,3 +1,6 @@
+use riscv::register::time;
+use crate::FREQUNCY;
+
 pub fn console_putchar(c: usize) { //TODO: error handling
     c
     .to_le_bytes()
@@ -19,5 +22,8 @@ pub fn shutdown(fail: bool) -> !{
 }
 
 pub fn sleep(sec: i32) {
-
+    let time_start = time::read();
+    let time_end = time_start + ( FREQUNCY * 100_0000 * sec ) as usize;
+    sbi_rt::set_timer(time_end as u64);
+    riscv::asm::wfi();
 }
