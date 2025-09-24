@@ -129,6 +129,90 @@ macro_rules! print {
 
 首先要了解format_args!宏，他应该是parse了一个patern,然后变成了一个`fmt::Arguments`类型，然后传给print，`fmt: literal (, (arg: tt)+)?`感觉就像是`"{} {}", 1, 2`这种pattern，所以感觉理解是啥意思没啥问题，但是让我写还是有些细节不太清楚
 
+## 基于 SBI 实现sleep
+
+> ** 实现一个基于rcore/ucore tutorial的应用程序C，用sleep系统调用睡眠5秒（in rcore/ucore tutorial v3: Branch ch1）
+
+ 睡（
+
+感觉这个应用程序的说法有歧义呀，应该他的意思就是在kernel上即S mode上实现，而不是广义的用户程序
+
+那就是调用sbi啰，直接去快速定位手册，有点找不到
+
+-----
+
+### 测试
+
+在看手册之前，我想给我的os加一个test（不然rust的模板ci过不去），主要分为单元测试和集成测试，我暂时也只需要单元测试，但是我发现一件事，我几乎现在所有的函数都是impure function，即会产生副作用的函数，比如说sleep这件事，你根本没有办法测他，一般来说，只能通过将impure func中pure的部分提取出来，从而测试pure部分的代码，但是我现在pure部分的代码过少，所以现在的测试没有什么意义，我暂时也只为他做一个占位符
+
+然后报错`can't find crate for test`，是因为test需要std，但是riscv64gc-unknown-none-elf没有std，所以就很麻烦，只能在内核中自己写测试框架，那就先搁置了
+
+-----
+
+找手册，找到了几个疑似的，一个是ch6 time，一个是ch11 pmu，因为有性能计数器，我想是不是有时钟相关的，一个是ch13 susp，暂停整个系统，类似la的idle，等待时钟中断（或其他中断）的发生，（其实还有一种可能，就是riscv的s mode有一些寄存器能直接读出时间）
+
+思路感觉是首先set timer interrupt，在5s之后，然后susp暂停整个系统，最后恢复的时候跳到函数的末尾
+
+ 在之前，我想看看各个寄存器的值，一种方法是用qemu直接拿值，一种方法是在rust中用csrr(pseudo CSRRS rd, csr, x0)，然后我打算还是用第二种来适配多种平台，但是如下会编译错误
+
+```rust
+pub fn read_csr(csrNum: i16) -> i64{
+    let read_value: i64;
+    unsafe {
+        asm!(
+            "csrr {0}, {csrNum}",
+            out(reg) read_value
+        )
+    }
+    read_value
+}
+```
+
+这是因为csrr中的csrNum必须在编译时完全确定，而不支持传参实现，于是不使用函数，使用macro（其实这里用proc-macro会更好我感觉，但是我有点不太会用）
+
+```rust
+#[macro_export]
+macro_rules! read_csr {
+    ($csrNum: expr) => {
+        {
+            use core::arch::asm;
+            let mut read_value: i64;
+            unsafe {
+                asm!(
+                    "csrr {0}, {1}",
+                    out(reg) read_value,
+                    const $csrNum
+                )
+            }
+            read_value
+        }
+    };
+}
+```
+
+之后如果传入一个非法或者没有权限的csrNum就会导致qemu卡住，用gdb调试才发现的（gdb可以添加`-ex 'layout asm' -tui`，来获得更好的调试体验）
+
+然后发现mtvec貌似在s mode下连读都读不了，于是还是用qemu吧，貌似用info reg可以看到所有寄存器，包括mtvec，或者gdb也可以看，gdb需要使用`info all-registers`，信息更详尽
+
+（之后发现有一个叫做riscv的crate，里面也提供了一个read_csr的方法，但是他是用concat构造这条指令的，然后我还是打算用他的实现）
+
+然后之后需要知道当前硬件的频率，看评论区是10mhz
+
+10mhz换算成每周期1.0e-7s，说明1s需要1e7个周期，5s就是5e7个周期
+
+然后貌似可以了
+
+```rust
+pub fn sleep(sec: i32) {
+    let time_start = time::read();
+    let time_end = time_start + ( FREQUNCY * 100_0000 * sec ) as usize;
+    sbi_rt::set_timer(time_end as u64);
+    riscv::asm::wfi();
+}
+```
+
+差不多正好5s
+
 [^1]: rustup是The Rust tool chain installer
 
 [^2]: [Attributes](https://dhghomon.github.io/easy_rust/Chapter_52.html#attributes)其可以控制编译器的一些行为，使用#控制下一个语句，而#!控制整个文件
