@@ -1,11 +1,12 @@
 use core::panic::PanicInfo;
 
-use crate::{println, sbi};
+use crate::sbi;
+use log::error;
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     if let Some(location) = _info.location() {
-        println!(
+        error!(
             "Panic at {}, line: {}, column: {}, due to {}.",
             location.file(),
             location.line(),
@@ -13,7 +14,7 @@ fn panic(_info: &PanicInfo) -> ! {
             _info.message()
         );
     } else {
-        println!("Panic due to {}", _info.message());
+        error!("Panic due to {}", _info.message());
     }
     sbi::shutdown(true);
 }

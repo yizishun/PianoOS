@@ -262,7 +262,7 @@ macro_rules! info {
 }
 ```
 
-不太会用rust的fmt工具，感觉有点丑陋，所以
+不太会用rust的fmt工具，感觉有点丑陋
 
 但是error，info，trace...这么多，相当于需要重复上述代码多次，并且容易写错，于是抽象出一个共通的宏
 
@@ -292,9 +292,32 @@ macro_rules! info {
         log_message!("INFO", $fmt $(, $($arg)+)?);
     };
 }
+...
 ```
 
 其中的`[{:<5}][{:<2}]`可以实现向左5对齐和向左2对齐
+
+### log等级控制
+
+ 首先就是他是一个config，然后这个config是从外部传入，然后内部程序能接收到这个config，然后转化为内部能理解的结构，然后所有的输出都能读取这个结构，来判断是否需要输出
+
+首先我要知道怎么从外部传入一个config，这里的外部传入是运行前传入，而不是编译时传入，所以不是kconfig那一套东西首先明确（即一定是运行时判断，而不是编译时判断）
+
+所以打算使用command line arugment，但是cli是基于os的，所以需要std，就很麻烦，现在运行时只有非常简陋的运行时环境，这意味着你甚至没有办法从文件中读config，就很麻烦，所以就更不太可能从command line拿值
+
+头脑有点混乱，理清一下，我是在一个真实硬件上运行的，什么cli最多传到qemu，但是如果是一个真实硬件呢，那就cli肯定传不进来，我的外部环境只有硬件和抱团取暖的sbi，所以真实的外部环境是拨码选择（
+
+打算看一眼参考实现
+
+参考实现使用`core::option_env`宏，在complie time拿env变量，然后展开成Some()，然后他还使用了log crate，但是impl了某些方法，（我发现rust真的好多crate呀，基本很多基本功能都有crate，但是c肯定没有这么多东西，所以我的第一反应才是造轮子）
+
+这个crate需要自己实现一个logger，然后使用set_logger来使用这个logger
+
+然后成功了
+
+这个成功了，那关闭所有输入就是LOG=OFF
+
+然后就是输出os的内存布局
 
 [^1]: rustup是The Rust tool chain installer
 
