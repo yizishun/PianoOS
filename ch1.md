@@ -213,6 +213,89 @@ pub fn sleep(sec: i32) {
 
 差不多正好5s
 
+## 彩色化LOG
+
+首先是ansi转义序列，虽然之前也听过，但是回想起来总是模糊，看到了一个比较好的知乎介绍https://zhuanlan.zhihu.com/p/570148970，才知道m原来是一个函数
+
+基本上要做的就是两件事
+
+- 根据log进行输出等级控制
+
+- 颜色输出
+
+还有两件事是实现完上述之后能做到
+
+- 关闭所有输出
+
+- 彩色输出os的内存布局
+
+首先完成最简单的颜色输出
+
+### 颜色输出
+
+直接使用和println一样的实现方法
+
+```rust
+#[macro_export]
+macro_rules! info {
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        $crate::console::print(format_args!(concat!("\x1b[0;34m", "[INFO] ", $fmt, "\x1b[0m", "\n") $(, $($arg)+)?));
+    };
+}
+```
+
+但是看到他的实现中有打印出当前打印这个语句的hart id，甚至推荐我们打印线程信息
+
+我查手册发现有一个csr叫做mhartid，但是在s mode下访问不了，查看有没有相关的sbi，有的，就叫做`sbi_get_marchid`，（那现在是直接在每次info的时候都读出hartid吗，这会不会造成性能损失呢？）
+
+```rust
+#[macro_export]
+macro_rules! info {
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        let hart_id = sbi::get_hartid();
+        $crate::console::print(
+            format_args!(
+                concat!("\x1b[0;34m", "[INFO][{}] ", $fmt, "\x1b[0m", "\n") , hart_id $(, $($arg)+)?
+            )
+        );
+    };
+}
+```
+
+不太会用rust的fmt工具，感觉有点丑陋，所以
+
+但是error，info，trace...这么多，相当于需要重复上述代码多次，并且容易写错，于是抽象出一个共通的宏
+
+```rust
+#![macro_use]
+macro_rules! log_message {
+    ($level: literal, $fmt: literal $(, $($arg: tt)+)?) => {
+        let ansi_color = match $level {
+            "INFO"  => "\x1b[0;34m",
+            "ERROR" => "\x1b[0;31m",
+            "WARN"  => "\x1b[0;93m",
+            "DEBUG" => "\x1b[0;32m",
+            "TRACE" => "\x1b[0;90m",
+            _       => "\x1b[0m"
+        };
+        let hart_id = sbi::get_hartid();
+        $crate::console::print(
+            format_args!(
+                concat!("{}", "[{:<5}][{:<2}] ", $fmt, "\x1b[0m", "\n") , ansi_color, $level, hart_id $(, $($arg)+)?
+            )
+        );
+    };
+}
+#[macro_export]
+macro_rules! info {
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        log_message!("INFO", $fmt $(, $($arg)+)?);
+    };
+}
+```
+
+其中的`[{:<5}][{:<2}]`可以实现向左5对齐和向左2对齐
+
 [^1]: rustup是The Rust tool chain installer
 
 [^2]: [Attributes](https://dhghomon.github.io/easy_rust/Chapter_52.html#attributes)其可以控制编译器的一些行为，使用#控制下一个语句，而#!控制整个文件
