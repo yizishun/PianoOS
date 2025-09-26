@@ -6,7 +6,7 @@ struct PianoLogger;
 static PIANOLOGGER: PianoLogger = PianoLogger;
 impl Log for PianoLogger {
     //only be use in log_enabled!, control the whole log
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
+    fn enabled(&self, _metadata: &log::Metadata) -> bool {
         true
     }
     fn flush(&self) {}
@@ -19,12 +19,11 @@ impl Log for PianoLogger {
             Level::Error => "\x1b[0;31m",
             Level::Warn  => "\x1b[0;93m",
             Level::Debug => "\x1b[0;32m",
-            Level::Trace => "\x1b[0;90m",
-            _       => "\x1b[0m"
+            Level::Trace => "\x1b[0;90m"
         };
         let hart_id = sbi::get_hartid();
         println!(
-            "{} [{:<5}][{:<2}] {}\x1b[0m" , 
+            "{}[kernel][{:<5}][{:<2}] {}\x1b[0m" , 
             ansi_color, 
             record.level(),
             hart_id,

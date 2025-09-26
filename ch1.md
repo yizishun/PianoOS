@@ -297,7 +297,7 @@ macro_rules! info {
 
 其中的`[{:<5}][{:<2}]`可以实现向左5对齐和向左2对齐
 
-### log等级控制
+## log等级控制
 
  首先就是他是一个config，然后这个config是从外部传入，然后内部程序能接收到这个config，然后转化为内部能理解的结构，然后所有的输出都能读取这个结构，来判断是否需要输出
 
@@ -318,6 +318,56 @@ macro_rules! info {
 这个成功了，那关闭所有输入就是LOG=OFF
 
 然后就是输出os的内存布局
+
+## 输出内存布局
+
+很奇怪，输出的地址不对
+
+```rust
+unsafe extern "C" {
+    static skernel: usize;
+    static stext: usize;
+    static etext: usize;
+}
+
+fn print_kernel_mem() {
+    unsafe {
+        info!("kernel base = {:#x}", skernel);
+        info!(".text: [{:#x}, {:#x}]", stext, etext);
+    }
+}
+```
+
+发现把skernel的type改成函数fn就可以正确打印了，很奇怪
+
+最后发现原因是如果声明为usize，那他的值会是这个地址的值，而不是地址，需要用`{:p}`+`&stext`来打印
+
+所以如果要直接获取这个符号的地址，使用fn确实是一个很好的实践
+
+之后发现了一个rustsbi-qemu上的一个写法错误
+
+```rust
+    // 全局初始化过程
+    if GENESIS.swap(false, Ordering::AcqRel) {
+        extern "C" {
+            static mut sbss: u64;
+            static mut ebss: u64;
+        }
+        unsafe {
+            let mut ptr = sbss as *mut u64;
+            let end = ebss as *mut u64;
+            while ptr < end {
+                ptr.write_volatile(0);
+                ptr = ptr.offset(1);
+            }
+        }
+```
+
+这个ptr和end都是sbss和ebss的值而不是地址，需要改成`let mut ptr = &raw mut sbss;`发了一个pr，[fix: use valid ptr instead of its value by yizishun · Pull Request #68 · rustsbi/rustsbi-qemu · GitHub](https://github.com/rustsbi/rustsbi-qemu/pull/68)，但是问了罗师傅，罗师傅跟他们组长说了之后，就把这个repo archived了，emmm，那我也应该转一下，转到rustsbi/rustsbi了
+
+## 将rustsbi-qemu转到rustsbi
+
+
 
 [^1]: rustup是The Rust tool chain installer
 

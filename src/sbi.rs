@@ -1,4 +1,5 @@
 use crate::FREQUNCY;
+use log::info;
 use riscv::register::time;
 
 pub fn console_putchar(c: usize) {
@@ -13,6 +14,8 @@ pub fn shutdown(fail: bool) -> ! {
     if fail {
         sbi_rt::system_reset(Shutdown, SystemFailure);
     } else {
+        info!("system will shutdown in 1 seconds");
+        sleep(1);
         sbi_rt::system_reset(Shutdown, NoReason);
     }
     unreachable!()
