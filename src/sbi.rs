@@ -1,6 +1,6 @@
 use crate::FREQUNCY;
 use log::info;
-use riscv::register::time;
+use riscv::register::{time, sie};
 
 pub fn console_putchar(c: usize) {
     //TODO: error handling
@@ -24,6 +24,7 @@ pub fn shutdown(fail: bool) -> ! {
 pub fn sleep(sec: i32) {
     let time_start = time::read();
     let time_end = time_start + (FREQUNCY * 100_0000 * sec) as usize;
+    unsafe {sie::set_stimer();}
     sbi_rt::set_timer(time_end as u64);
     riscv::asm::wfi();
 }
