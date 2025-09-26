@@ -367,7 +367,21 @@ fn print_kernel_mem() {
 
 ## 将rustsbi-qemu转到rustsbi
 
+正好的milk-v duo到了，也需要rustsbi
 
+经过我的研究，用法如下
+
+```shell
+git clone git@github.com:rustsbi/rustsbi.git
+cd rustsbi
+cargo prototyper --jump
+```
+
+然后把生成出来的bin文件丢到之前的bootloader部分，就可以正常启动啦
+
+看起来他的option有三种，jump，payload和dynamic
+
+## challenge: 支持多核，实现多个核的 boot
 
 [^1]: rustup是The Rust tool chain installer
 

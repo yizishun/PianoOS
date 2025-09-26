@@ -15,19 +15,23 @@ impl Log for PianoLogger {
             return;
         }
         let ansi_color = match record.level() {
-            Level::Info  => "\x1b[0;34m",
-            Level::Error => "\x1b[0;31m",
-            Level::Warn  => "\x1b[0;93m",
-            Level::Debug => "\x1b[0;32m",
-            Level::Trace => "\x1b[0;90m"
+            Level::Info  => "\x1b[1;34m",
+            Level::Error => "\x1b[1;31m",
+            Level::Warn  => "\x1b[1;93m",
+            Level::Debug => "\x1b[1;32m",
+            Level::Trace => "\x1b[1;90m"
         };
         let hart_id = sbi::get_hartid();
+        let ansi_reset = "\x1b[0m";
+        let bold = "\x1b[1;37m";
         println!(
-            "{}[kernel][{:<5}][{:<2}] {}\x1b[0m" , 
-            ansi_color, 
+            "{bold}[kernel]{reset}{color_log} {:<5}[{:>2}]{reset} - {}" , 
             record.level(),
             hart_id,
-            record.args()
+            record.args(),
+            reset = ansi_reset,
+            color_log = ansi_color,
+            bold = bold
         );
 
     }
