@@ -24,7 +24,8 @@ OBJCOPY := rust-objcopy --binary-architecture=riscv64
 GDB := riscv64-none-elf-gdb
 
 #Qemu
-QEMU_ARGS := -machine virt \
+QEMU_ARGS := -smp 2 \
+			 -machine virt \
 			 -nographic \
 			 -bios $(BOOTLOADER) \
 			 -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA)
@@ -52,6 +53,10 @@ disasm: build
 
 .PHONY: run
 run: build
+	$(QEMU_NAME) $(QEMU_ARGS)
+
+.PHONY: qemu
+qemu:
 	$(QEMU_NAME) $(QEMU_ARGS)
 
 .PHONY: gdbserver gdbclient

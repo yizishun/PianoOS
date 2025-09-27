@@ -32,6 +32,9 @@ SECTIONS
 
     .bss : {
         *(.bss.stack)
+        sheap = .;
+        *(.bss.heap)
+        eheap = .;
         sbss = .;
         *(.bss .bss.*)
         *(.sbss .sbss.*)

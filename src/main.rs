@@ -4,12 +4,17 @@
 use core::arch::global_asm;
 use log::{info};
 
-const FREQUNCY: i32 = 10;
+use crate::{mm::heap::heap_init, platform::PLATFORM};
 
 mod console;
 mod lang_items;
 mod sbi;
 mod logging;
+mod devicetree;
+mod platform;
+mod mm;
+
+extern crate alloc;
 
 global_asm!(include_str!("entry.asm"));
 unsafe extern "C" {
@@ -22,16 +27,49 @@ unsafe extern "C" {
     static edata: usize;
     static boot_stack_lower_bound: usize;
     static boot_stack_top: usize;
+    static sheap: usize;
+    static eheap: usize;
     static sbss: usize;
     static ebss: usize;
     static ekernel: usize;
 }
 
+const FREQUNCY: i32 = 10;
+static mut BOOT_HARTID: usize = 0;
+
 #[unsafe(no_mangle)]
-pub fn rust_main() -> ! {
+extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
+    // 1. get boot hartid and device tree addr 
+    // SAFETY: boot_hartid will be assign once at boot time
+    unsafe {
+        BOOT_HARTID = hartid;
+    }
+    // 2. clear bss and heap init
     clear_bss();
+    heap_init();
+    // 3. boot hart init loging system
     logging::init().expect("Logging System init fail");
+    info!("1.Logging system init success ------");
+    info!("boot hartid: {}", hartid);
+    info!("device tree addr: {:p}", device_tree as *const u8);
+    // 4. parse device tree
+    info!("2.Parsing DTB ----------------------");
+    // SAFETY: PLATFORM infomation will be init once
+    #[allow(static_mut_refs)]
+    unsafe { 
+        PLATFORM.init(device_tree); 
+        info!("Cpu Number: {}", PLATFORM.board_info.cpu_num);
+    }
+    // 5. boot hart prepare env for all harts
+    // 6. boot hart start other harts
+    // 7. print some kernel information
     print_kernel_mem();
+    info!("kernel hart number: {}", sbi::hart::get_hartnum());
+    info!("kernel current hart state: {}", sbi::hart::get_cur_hart_state());
+    (0..sbi::hart::get_hartnum()).for_each(|id|{
+        info!("hart{}: {}", id, sbi::hart::get_hart_state(id))
+    });
+    // 8. boot hart shutdown
     sbi::shutdown(false);
 }
 
@@ -54,6 +92,7 @@ fn print_kernel_mem() {
         info!(".rodata   : [{:<10p}, {:<10p}]", &srodata, &erodata);
         info!(".data     : [{:<10p}, {:<10p}]", &sdata, &edata);
         info!(".bss.stack: [{:<10p}, {:<10p}]", &boot_stack_lower_bound, &boot_stack_top);
+        info!(".bss.heap : [{:<10p}, {:<10p}]", &sheap, &eheap);
         info!(".bss      : [{:<10p}, {:<10p}]", &sbss, &ebss);
         info!("kernel end = {:<10p}", &ekernel);
     }

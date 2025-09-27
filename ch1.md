@@ -367,7 +367,7 @@ fn print_kernel_mem() {
 
 ## 将rustsbi-qemu转到rustsbi
 
-正好的milk-v duo到了，也需要rustsbi
+正好的milk-v duo到了，也需要rustsbin
 
 经过我的研究，用法如下
 
@@ -382,6 +382,251 @@ cargo prototyper --jump
 看起来他的option有三种，jump，payload和dynamic
 
 ## challenge: 支持多核，实现多个核的 boot
+
+这个貌似对我有点难度的，之前从没接触过多核，多核编程多核设计，对我都是空白的，所以能研究多少就研究多少吧
+
+打算先读一下rustsbi启动时候是如何处理多核的，因为从启动信息来看，他打印了设备有多少核
+
+```rust
+#[unsafe(naked)]
+#[unsafe(link_section = ".text.entry")]
+#[unsafe(export_name = "_start")]
+unsafe extern "C" fn start() -> ! {
+    naked_asm!(
+        ".option arch, +a",
+        // 1. Turn off interrupt.
+        "
+        csrw    mie, zero",
+        // 2. Initialize programming language runtime.
+        // only clear bss if hartid matches preferred boot hart id.
+        // Race
+        "
+            lla      t0, 6f
+            li       t1, 1
+            amoadd.w t0, t1, 0(t0)
+            bnez     t0, 4f
+            call     {relocation_update}",
+        // 3. Boot hart clear bss segment.
+        "1:
+            lla     t0, sbi_bss_start
+            lla     t1, sbi_bss_end",
+        "2:
+            bgeu    t0, t1, 3f
+            sd      zero, 0(t0)
+            addi    t0, t0, 8
+            j       2b",
+        // 3.1 Boot hart set bss ready signal.
+        "3:
+            lla     t0, 7f
+            li      t1, 1
+            amoadd.w t0, t1, 0(t0)
+            j       5f",
+        // 3.2 Other harts are waiting for bss ready signal.
+        "4:
+            lla     t0, 7f
+            lw      t0, 0(t0)
+            beqz    t0, 4b",
+        // 4. Prepare stack for each hart.
+        "5:
+            call    {locate_stack}
+            call    {main}
+            csrw    mscratch, sp
+            j       {hart_boot}
+            .balign  4",
+        "6:", // boot hart race signal.
+        "  .word    0",
+        "7:", // bss ready signal.
+        "  .word    0",
+        relocation_update = sym relocation_update,
+        locate_stack = sym trap_stack::locate,
+        main         = sym rust_main,
+        hart_boot    = sym trap::boot::boot,
+    )
+}
+```
+
+首先他直接使用extern “C”+各种属性来将这个函数作为一个c函数全局导出（我感觉我也能这么写）
+
+首先是naked attr，可以参考（https://blog.rust-lang.org/2025/07/03/stabilizing-naked-functions/），虽然不是手册，但是写的比较易懂，然后上面说extern “C”之类的函数一般没有办法被rust代码call，因为他没有一个确定的调用规范，所以一般在另一些asm中手动call
+
+emmm，基本上看rustsbi的启动代码，就是让每一个核获得自己的stack，让第一个核做更多的事情（比如relocat一些代码）
+
+然后查找sbi手册，发现了HSM扩展，就是对于多个hart进行管理，但是我没有找到在哪能知道有多少个hart，通过while循环来看sbi是否返回错误，判断出有8个hart，但是我才启动2个smp，感觉有点问题，应该不是这么做的，问gpt说要看sbi给的设备树，说a1寄存器会给设备树指针，感觉需要小心求证，于是开始看sbi的源码（因为手册上实在没有翻到）
+
+源码上确实是这么说的，但是我始终没有找到对应的手册
+
+sbi手册上说*The SBI specification doesn’t specify any method for hardware discovery. The supervisor software must rely on the other industry standard hardware discovery methods (i.e. Device Tree or ACPI) for that.* 然后我就不知道究竟去哪里找这个规范了
+
+问了罗师傅，说可能在kernel的手册上定义了这个事情，但是大多还是约定俗成的，上述说的8个harts的问题可能是因为rustsbi的实现问题，然后我发现我获得当前hart的id的行为是错误的，应该是要获得mhartid而不是marchid，但是看起来这个没有纳入到规范确实有很多人有意见，有几个比较相关的讨论，https://github.com/riscv-non-isa/riscv-sbi-doc/issues/141，linux kernel的规范：https://www.kernel.org/doc/html/next/riscv/boot.html，
+
+所以上述的的省流版就是rustsbi跳到kernel的时候，a0存放hartid，a1存放设备树地址，并且手册没有规范这件事情
+
+然后rust_main要想拿到这两个参数，我想是不是需要将函数声明为extern "C"
+
+然后我需要保存这两个参数，我一开始想的是用全局变量，但是我又发现，每一个hart都有可能覆盖这个全局变量，这意味着我至少需要n个这个全局变量
+
+好在每个hart的寄存器是独立的，并且我可以找到一个叫做sscratch的寄存器，我打算每一个hart开辟一个空间保存他们诸如hartid这种信息，我打算学rustsbi定义一个最大的hart数量，然后就可以开始保存了，不然我根本没有办法call其他函数，但是我又发现一个事情，就是跳到kernel的时候，只有boot hart是start，这就意味着我一开始并不需要考虑很复杂的事情，基本上流程如下
+
+- boot hart首先获得boot hartid+device tree地址（该把这个信息存在哪里比较符合rust风格呢？我现在就简单的存在全局变量里面了）
+
+- boot hart开始清理bss段
+
+- boot hart 做log系统初始化（optional）
+
+- boot hart开始做设备树解析，找出有多少个cpu
+
+- boot hart为所有cpu做环境的准备
+
+- boot hart调用`sbi_hart_start`，让所有hart进入一个初始函数，并打印一些东西之后开始死循环
+
+- boot hart做shutdown
+
+parse device tree有点不会，打算先看看device tree的手册，然后再看一下rustsbi的实现
+
+emm，打算抄袭一下rustsbi中解析设备树的实现（等我实现完我再看他的具体实现），但是使用时，遇到了
+
+`error: no global memory allocator found but one is required; link to std or add `#[global_allocator]` to a static item that implements the GlobalAlloc trait`说我没有heap
+
+直接提前读第四章：[Rust 中的动态内存分配 - rCore-Tutorial-Book-v3 3.6.0-alpha.1 文档](https://rcore-os.cn/rCore-Tutorial-Book-v3/chapter4/1rust-dynamic-allocation.html?highlight=global)
+
+## 真实硬件：milkv duo256m
+
+在做challenge的时候新开了一个坑，用的是没有多hart boot的kernel
+
+首先这个的手册在：https://milkv.io/docs/duo/getting-started/duo256m
+
+有点麻烦的，我打算做成功之后做一个b站视频，感觉会有不错的流量
+
+首先，这个板子的启动流程理论可以参考：[articles/20240329-duo-bootflow.md · unicornx/tblog - Gitee.com](https://gitee.com/unicornx/tblog/blob/master/articles/20240329-duo-bootflow.md) 
+
+然后启动流程实践可以参考：[使用 Opensbi 引导自己的操作系统 - Duo - Milk-V Community](https://community.milkv.io/t/opensbi/681)
+
+总而言之，这个板子启动时，首先是bootrom，他会加载fip.bin文件，首先加载fip.bin中的fsbl（bl2），然后bl2开始加载rustsbi（bl31），然后bl2开始加载我的kernel（bl33），然后就是跳转到rustsbi，然后就是普通的启动流程了
+
+所以最关键的目的是获得custom的一个fip.bin文件
+
+首先clone这个v2的sdk repo，cd进入，然后
+
+```shell
+> source ./device/milkv-duo256m-musl-riscv64-sd/boardconfig.sh 
+> source ./build/envsetup_milkv.sh #（如果没有/bin/pwd,修改里面的硬编码路径）
+Select a target to build:
+1. milkv-duo-musl-riscv64-sd
+2. milkv-duo256m-glibc-arm64-sd
+3. milkv-duo256m-musl-riscv64-sd
+4. milkv-duos-glibc-arm64-emmc
+5. milkv-duos-glibc-arm64-sd
+6. milkv-duos-musl-riscv64-emmc
+7. milkv-duos-musl-riscv64-sd
+Which would you like: 3
+Target Top Config: /home/yzs/rcore/duo-buildroot-sdk-v2/build/boards/cv181x/sg2002_milkv_duo256m_musl_riscv64_sd/sg2002_milkv_duo256m_musl_riscv64_sd_defconfig
+Target Board: milkv-duo256m-musl-riscv64-sd
+Target Board Storage: sd
+Target Board Config: /home/yzs/rcore/duo-buildroot-sdk-v2/device/target/boardconfig.sh
+Target Board Type: duo256m
+Target Image Config: /home/yzs/rcore/duo-buildroot-sdk-v2/device/target/genimage.cfg
+Build tdl-sdk: 1
+Output dir: /home/yzs/rcore/duo-buildroot-sdk-v2/install/soc_sg2002_milkv_duo256m_musl_riscv64_sd
+
+> defconfig sg2002_milkv_duo256m_musl_riscv64_sd
+ Run defconfig function 
+Loaded configuration '/home/yzs/rcore/duo-buildroot-sdk-v2/build/boards/cv181x/sg2002_milkv_duo256m_musl_riscv64_sd/sg2002_milkv_duo256m_musl_riscv64_sd_defconfig'
+No change to configuration in '.config'
+Loaded configuration '.config'
+No change to minimal configuration in '/home/yzs/rcore/duo-buildroot-sdk-v2/build/.defconfig'
+~/rcore/duo-buildroot-sdk-v2/build ~/rcore/duo-buildroot-sdk-v2
+~/rcore/duo-buildroot-sdk-v2
+
+====== Environment Variables ======= 
+
+  PROJECT: sg2002_milkv_duo256m_musl_riscv64_sd, DDR_CFG=ddr3_1866_x16
+  CHIP_ARCH: CV181X, DEBUG=0
+  SDK VERSION: musl_riscv64, RPC=0
+  BOARD TYPE: duo256m
+  ATF options: ATF_KEY_SEL=default, BL32=1
+  Linux source folder:linux_5.10, Uboot source folder: u-boot-2021.10
+  CROSS_COMPILE_PREFIX: riscv64-unknown-linux-musl-
+  ENABLE_BOOTLOGO: 0
+  Flash layout xml: /home/yzs/rcore/duo-buildroot-sdk-v2/build/boards/cv181x/sg2002_milkv_duo256m_musl_riscv64_sd/partition/partition_sd.xml
+  Target Top Config: /home/yzs/rcore/duo-buildroot-sdk-v2/build/boards/cv181x/sg2002_milkv_duo256m_musl_riscv64_sd/sg2002_milkv_duo256m_musl_riscv64_sd_defconfig
+  Sensor tuning bin: sms_sc2336
+  Output path: /home/yzs/rcore/duo-buildroot-sdk-v2/install/soc_sg2002_milkv_duo256m_musl_riscv64_sd
+
+
+> 
+```
+
+但是运行下一步时报错很麻烦，打算使用他的docker
+
+```bash
+cd duo-buildroot-sdk-v2
+docker run -itd --name duodocker -v $(pwd):/home/work milkvtech/milkv-duo:latest /bin/bash
+```
+
+不知道为啥，我用docker来build也会在uboot编译报错，于是我直接更改了fip_v2.mk文件，让他不依赖uboot
+
+```diff
+diff --git a/build/scripts/fip_v2.mk b/build/scripts/fip_v2.mk
+index 9a352403d..544fb5ea3 100644
+--- a/build/scripts/fip_v2.mk
++++ b/build/scripts/fip_v2.mk
+@@ -11,10 +11,10 @@ opensbi-clean:
+
+ FSBL_OUTPUT_PATH = ${FSBL_PATH}/build/${PROJECT_FULLNAME}
+ ifeq ($(call qstrip,${CONFIG_ARCH}),riscv)
+-fsbl-build: opensbi
++fsbl-build: 
+ endif
+ ifeq (${CONFIG_ENABLE_FREERTOS},y)
+-fsbl-build: rtos
++fsbl-build: 
+ fsbl%: export BLCP_2ND_PATH=${FREERTOS_PATH}/cvitek/install/bin/cvirtos.bin
+ fsbl%: export RTOS_DUMP_PRINT_ENABLE=$(CONFIG_ENABLE_RTOS_DUMP_PRINT)
+ fsbl%: export RTOS_DUMP_PRINT_SZ_IDX=$(CONFIG_DUMP_PRINT_SZ_IDX)
+@@ -39,14 +39,14 @@ fsbl%: export LOG_LEVEL=2
+ endif
+
+ ifeq (${CONFIG_ENABLE_BOOT0},y)
+-fsbl-build: u-boot-build memory-map
++fsbl-build: memory-map
+        $(call print_target)
+        ${Q}mkdir -p ${FSBL_PATH}/build
+        ${Q}ln -snrf -t ${FSBL_PATH}/build ${CVI_BOARD_MEMMAP_H_PATH}
+        ${Q}$(MAKE) -j${NPROC} -C ${FSBL_PATH} O=${FSBL_OUTPUT_PATH} LOG_LEVEL=${LOG_LEVEL}
+        ${Q}cp ${FSBL_OUTPUT_PATH}/boot0 ${OUTPUT_DIR}/
+ else
+-fsbl-build: u-boot-build memory-map
++fsbl-build: memory-map
+        $(call print_target)
+        ${Q}mkdir -p ${FSBL_PATH}/build
+        ${Q}ln -snrf -t ${FSBL_PATH}/build ${CVI_BOARD_MEMMAP_H_PATH}
+```
+
+然后重新运行build_fsbl就可以生成bl2啦
+
+然后运行
+
+```shell
+./plat/cv181x/fiptool.py -v genfip \
+        '/home/work/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/fip.bin' \
+        --MONITOR_RUNADDR="0x0000000080000000" \
+        --CHIP_CONF='/home/work/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/chip_conf.bin' \
+        --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' \
+        --NAND_INFO='00000000'\
+        --BL2='/home/work/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/bl2.bin' \
+        --MONITOR='../rustsbi-prototyper-payload.bin' \
+        --LOADER_2ND='../PianoOS.bin' \
+```
+
+我的PiannoOS不符合bl33格式，所以我直接删掉了这一行，毕竟我这个payload rustsbi本身就要有把我的os加载的功能，然后成功生成fip.bin
+
+现在需要将他烧到tf卡上，然后boot，所以至少需要以下工具
+
+- tf卡
+
+- tf卡读卡器
+
+- usb-ttl串口线
 
 [^1]: rustup是The Rust tool chain installer
 

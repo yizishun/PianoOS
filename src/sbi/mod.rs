@@ -1,3 +1,5 @@
+pub mod hart;
+
 use crate::FREQUNCY;
 use log::info;
 use riscv::register::{time, sie};
@@ -29,6 +31,3 @@ pub fn sleep(sec: i32) {
     riscv::asm::wfi();
 }
 
-pub fn get_hartid() -> usize {
-    sbi_rt::get_marchid()
-}

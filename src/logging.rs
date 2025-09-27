@@ -21,7 +21,7 @@ impl Log for PianoLogger {
             Level::Debug => "\x1b[1;32m",
             Level::Trace => "\x1b[1;90m"
         };
-        let hart_id = sbi::get_hartid();
+        let hart_id = sbi::hart::get_cur_hartid();
         let ansi_reset = "\x1b[0m";
         let bold = "\x1b[1;37m";
         println!(
