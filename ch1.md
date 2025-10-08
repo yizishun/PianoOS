@@ -559,8 +559,33 @@ No change to minimal configuration in '/home/yzs/rcore/duo-buildroot-sdk-v2/buil
 但是运行下一步时报错很麻烦，打算使用他的docker
 
 ```bash
-cd duo-buildroot-sdk-v2
-docker run -itd --name duodocker -v $(pwd):/home/work milkvtech/milkv-duo:latest /bin/bash
+set -euo pipefail    
+
+echo "== Check binfmt mount =="
+mount | grep -q binfmt_misc || sudo mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc
+ls /proc/sys/fs/binfmt_misc || true
+
+echo "== Reinstall emulators =="
+docker run --privileged --rm tonistiigi/binfmt --uninstall qemu-* || true
+docker run --privileged --rm tonistiigi/binfmt --install amd64,riscv64,arm64
+docker run --privileged --rm tonistiigi/binfmt
+
+echo "== Pull & run test images =="
+docker pull --platform=linux/amd64 debian:stable-slim
+docker run --rm --platform=linux/amd64 debian:stable-slim uname -m
+
+docker pull --platform=linux/riscv64 debian:stable-slim
+docker run --rm --platform=linux/riscv64 debian:stable-slim uname -m
+
+sudo docker run -it --name duodocker \                                                                                  
+  --platform=linux/amd64 \
+  -v "$(pwd)":/home/work \
+  guttatus314/milkv-duo:rust /bin/bash
+
+sudo docker run -it --name duodocker \             
+  --platform=linux/amd64 \
+  -v "$(pwd)":/home/work \
+  milkvtech/milkv-duo:latest /bin/bash
 ```
 
 不知道为啥，我用docker来build也会在uboot编译报错，于是我直接更改了fip_v2.mk文件，让他不依赖uboot
@@ -620,6 +645,77 @@ index 9a352403d..544fb5ea3 100644
 
 我的PiannoOS不符合bl33格式，所以我直接删掉了这一行，毕竟我这个payload rustsbi本身就要有把我的os加载的功能，然后成功生成fip.bin
 
+```shell
+./plat/cv181x/fiptool.py -v genfip \
+        '/home/work/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/fip.bin' \
+        --MONITOR_RUNADDR="0x80000000" \
+        --CHIP_CONF='/home/work/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/chip_conf.bin' \
+        --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' \
+        --NAND_INFO='00000000'\
+        --BL2='/home/work/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/bl2.bin' \
+        --MONITOR='../opensbi/build/platform/generic/firmware/fw_dynamic.bin' \
+        --LOADER_2ND='/home/work/u-boot-2021.10/build/sg2002_milkv_duo256m_musl_riscv64_sd/u-boot-raw.bin' \
+        --compress='lzma'
+```
+
+```shell
+./plat/cv180x/fiptool.py -v genfip \
+    'build/sg2002_milkv_duo256m_musl_riscv64_sd/fip.bin' \
+    --MONITOR_RUNADDR="0x0" \
+    --CHIP_CONF='build/sg2002_milkv_duo256m_musl_riscv64_sd/chip_conf.bin' \
+    --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' \
+    --NAND_INFO='00000000'\
+    --BL2='build/sg2002_milkv_duo256m_musl_riscv64_sd/bl2.bin' \
+    --LOADER_2ND='./bl33.bin'
+```
+
+```shell
+> sudo ./plat/cv181x/fiptool.py -v genfip \
+        '/home/yzs/rcore/duo-buildroot-sdk-v2/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/fip.bin' \
+        --MONITOR_RUNADDR="0x0000000080000000" \
+        --CHIP_CONF='/home/yzs/rcore/duo-buildroot-sdk-v2/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/chip_conf.bin' \
+        --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' \
+        --NAND_INFO='00000000'\
+        --BL2='/home/yzs/rcore/duo-buildroot-sdk-v2/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/bl2.bin' \
+        --MONITOR='../rustsbi-prototyper-payload.bin'
+```
+
+```shell
+. /home/work/fsbl/build/cv1812cp_milkv_duo256m_sd/blmacros.env && \
+./plat/cv181x/fiptool.py -v genfip \
+        '/home/work/fsbl/build/cv1812cp_milkv_duo256m_sd/fip.bin' \
+        --MONITOR_RUNADDR="0x80000000" \
+        --CHIP_CONF='./build/cv1812cp_milkv_duo256m_sd/chip_conf.bin' \
+        --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' \
+        --NAND_INFO='00000000'\
+        --BL2='./build/cv1812cp_milkv_duo256m_sd/bl2.bin' \
+        --BLCP_IMG_RUNADDR=0x05200200 \
+        --BLCP_PARAM_LOADADDR=0 \
+        --BLCP=test/empty.bin \
+        --DDR_PARAM='test/cv181x/ddr_param.bin' \
+        --MONITOR='../rustsbi/target/riscv64gc-unknown-none-elf/release/rustsbi-prototyper-dynamic.bin' \
+        --LOADER_2ND='../u-boot-2021.10/build/cv1812cp_milkv_duo256m_sd/u-boot-raw.bin' \
+        --compress='lzma'
+
+
+./plat/cv181x/fiptool.py -v genfip         '/home/work/fsbl/build/cv1812cp_milkv_duo256m_sd/fip.bin'         --MONITOR_RUNADDR="0x80000000"         --CHIP_CONF='./build/cv1812cp_milkv_duo256m_sd/chip_conf.bin'         --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF'         --NAND_INFO='00000000'        --BL2='./build/cv1812cp_milkv_duo256m_sd/bl2.bin'         --BLCP_IMG_RUNADDR=0x05200200         --BLCP_PARAM_LOADADDR=0         --BLCP=test/empty.bin         --DDR_PARAM='test/cv181x/ddr_param.bin'         --MONITOR='../rustsbi/target/riscv64gc-unknown-none-elf/release/rustsbi-prototyper-dynamic.bin'         --LOADER_2ND='../PianoOS.bin'         --compress='lzma'
+
+./plat/cv181x/fiptool.py -v genfip \
+        '/home/work/fsbl/build/cv1812cp_milkv_duo256m_sd/fip.bin' \
+        --MONITOR_RUNADDR="0x80000000" \
+        --CHIP_CONF='/home/work/fsbl/build/cv1812cp_milkv_duo256m_sd/chip_conf.bin' \
+        --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' \
+        --NAND_INFO='00000000'\
+        --BL2='/home/work/fsbl/build/cv1812cp_milkv_duo256m_sd/bl2.bin' \
+        --BLCP_IMG_RUNADDR=0x05200200 \
+        --BLCP_PARAM_LOADADDR=0 \
+        --BLCP=test/empty.bin \
+        --DDR_PARAM='test/cv181x/ddr_param.bin' \
+        --MONITOR='../opensbi/build/platform/generic/firmware/fw_dynamic.bin' \
+        --LOADER_2ND='../PianoOS.bin' \
+        --compress='lzma'
+```
+
 现在需要将他烧到tf卡上，然后boot，所以至少需要以下工具
 
 - tf卡
@@ -627,6 +723,75 @@ index 9a352403d..544fb5ea3 100644
 - tf卡读卡器
 
 - usb-ttl串口线
+
+- 
+
+买回来了，第一件事是将fip.bin烧到我的tf卡上
+
+他貌似需要tf卡有特定的格式，最简单的方式就是下载他的一个img,然后用dd写入tf卡，他会把格式之类的东西全部写入，按理来说，改变他boot分区的fip.bin然后删掉其他文件就可以了，之后用他的img成功点亮板卡，但是串口始终没有输出，我怀疑是我的串口线的问题，因为好像没有白色的线，于是重新买了一个
+
+重新买了一个就可以了，但是又有一个新的问题，就是没有办法输入，至少给的img可以输出到终端，但是没有办法输入命令
+
+然后使用我自己的fip.bin，发现串口输出乱码
+
+然后尝试使用设备树
+
+```shell
+cpp -P -nostdinc -undef -D__DTS__ -x assembler-with-cpp \
+  -I ../../../default/dts/cv181x_riscv/ \
+  -I ../../../default/dts/ \
+  -I ../../../../../build/boards/default/dts/cv181x \
+  -I ../../../../../build/output/sg2002_milkv_duo256m_musl_riscv64_sd \
+  -I ../../../../../linux_5.10/include \
+  sg2002_milkv_duo256m_musl_riscv64_sd.dts \
+  > ./tmp_sg2002_preprocessed.dts
+> dtc -I dts -O dtb \
+  -o sg2002_milkv_duo256m_musl_riscv64_sd.dtb \
+  ./tmp_sg2002_preprocessed.dts
+> cargo prototyper --payload /home/yzs/rcore/PianoOS/target/riscv64gc-unknown-none-elf/release/PianoOS.bin --fdt /home/yzs/rcore/duo-buildroot-sdk-v2/build/boards/cv181x/sg2002_milkv_duo256m_musl_riscv64_sd/dts_riscv/sg2002_milkv_duo256m_musl_riscv64_sd.fdt
+```
+
+但是仍然失败，但是发现了bl2的源码
+
+按理来说，我看懂bl2的源码就基本知道问题所在了
+
+bl2对于一些定义是硬编码的，但是按理来说应该不会有问题
+
+之后我发现fip.bin是需要签名的，但是签名之后依然失败
+
+md我真的怀疑是硬件问题了，但是用别人的镜像又没问题，所以还是fip.bin的问题，我猜测还是bl2的问题，但是我不知道问题在哪
+
+然后我打算重新编译一次（全部编译，包括uboot等），但是发现报错
+
+```
+  [TARGET] rtos 
+cd /home/work/freertos/cvitek && ./build_cv181x.sh
+RUN TYPE:  CVIRTOS
+RUN_ARCH:  riscv64
+/home/work/freertos/cvitek/build/arch /home/work/freertos/cvitek
+cmake: error while loading shared libraries: libstdc++.so.6: failed to map segment from shared object
+make: *** [scripts/rtos.mk:3: rtos] Error 127
+```
+
+这个报错疑似是电脑太垃圾了
+
+打算使用我的另一台电脑编译，普通编译，可以运行到opensbi和uboot，但是我神奇的发现，bl2依然是乱码，这意味着bl2确实有问题，导致我没有办法把rustsbi移植上去（rustsbi也是乱码）
+
+bl2是乱码，但是opensbi和uboot不是，这意味着opensbi和uboot使用了编译时的设备树
+
+哇，我真sb，啊不对，是这个sdk真sb，这个sdkv2有bug我感觉，他这个就是会导致bl2乱码，总之不要用就完事了
+
+移植的时候发现他会跳到0x80200020，所以需要改掉我代码里所有依赖0x80200000的地方，这个之后肯定需要支持不同的地址，不对，我发现他会智能跳过这段bl33的校检代码，所以不需要该任何地方，然后现在我的kernel输出乱码，然后我不知道为啥我用他的rustsbi编译的文件不会报错，但是用我单独clone的会报错（TODOc）
+
+### 串口驱动
+
+之后发现，使用sbi的putchar会打印不出东西，虽然我知道打印正解是自己解析设备树，所以我打算先自己解析设备树，然后打印看一下sbi的putchar的返回值
+
+然后如果自己解析设备树的然后写串口驱动的话，就必然会面临不同platform使用的uart的设备不同+base addr不同了，所以需要需要多套代码，所以又需要进行抽象，基本上是把putchar做抽象，底层使用不同的驱动程序，然后addr+driver分开
+
+然后我打算看一下rcore第九章的某些内容学习一下
+
+感觉组织上来说，就是首先把他规划到一个叫做driver/chardev或者uart的mod下，然后定义一套类似trait/interface的东西，然后就是每种串口型号分不同的mod，他们都会实现这个trait，但是，他们的base addr需要从外部传入，类似于预制菜需要加热一样，然后还有一个叫做board的mod，他就相当于是成品，就是他规范了每个board所有的uart实现+base addr，使不使用这个成品都无所谓，但是其实本质上是要通过解析设备树和chosen来决定怎么选择实现和base addr
 
 [^1]: rustup是The Rust tool chain installer
 
