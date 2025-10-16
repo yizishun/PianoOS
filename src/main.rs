@@ -2,6 +2,7 @@
 #![no_main]
 
 use core::arch::global_asm;
+use alloc::boxed::Box;
 use log::{info};
 
 use crate::{mm::heap::heap_init, platform::PLATFORM};
@@ -46,15 +47,15 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     unsafe {
         BOOT_HARTID = hartid;
     }
+    // 2. clear bss and heap init
+    clear_bss();
+    heap_init();
     // SAFETY: PLATFORM infomation will be init once
     #[allow(static_mut_refs)]
     unsafe { 
         PLATFORM.init(device_tree); 
         info!("Cpu Number: {}", PLATFORM.board_info.cpu_num.unwrap());
     }
-    // 2. clear bss and heap init
-    clear_bss();
-    heap_init();
     // 3. boot hart init loging system
     logging::init().expect("Logging System init fail");
     info!("1.Logging system init success ------");

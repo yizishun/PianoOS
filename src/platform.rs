@@ -59,16 +59,21 @@ impl Platform {
         self.board_info.cpu_num = Some(tree.cpus.cpu.len());
 
         //TODO: use Uart16550 temporily
-        //let base = 0x04140000;
-        let base = 0x10000000;
-        //let console_type = ConsoleType::RiscvSbi;
-        let console_type = ConsoleType::Uart16550U8;
-        //let console = Uart16550Wrapper::<u8>::new(base);
+        let base = 0x04140000;
+        //let base = 0x10000000;
+        let console_type = ConsoleType::RiscvSbi;
+        //let console_type = ConsoleType::Uart16550U32;
+        //let console = Uart16550Wrapper::<u32>::new(base);
+        let console = RiscvSbi;
         //let console = RiscvSbi;
         self.board_info.console = Some((base, console_type));
         self.board_device.console = Some(
             KernelConsole::new(
-                Mutex::new(Box::new(Uart16550Wrapper::<u8>::new(base)))
+                Mutex::new(
+                    Box::new(
+                        console
+                    )
+                )
             )
         )
     }

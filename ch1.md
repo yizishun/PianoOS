@@ -781,7 +781,7 @@ bl2是乱码，但是opensbi和uboot不是，这意味着opensbi和uboot使用�
 
 哇，我真sb，啊不对，是这个sdk真sb，这个sdkv2有bug我感觉，他这个就是会导致bl2乱码，总之不要用就完事了
 
-移植的时候发现他会跳到0x80200020，所以需要改掉我代码里所有依赖0x80200000的地方，这个之后肯定需要支持不同的地址，不对，我发现他会智能跳过这段bl33的校检代码，所以不需要该任何地方，然后现在我的kernel输出乱码，然后我不知道为啥我用他的rustsbi编译的文件不会报错，但是用我单独clone的会报错（TODOc）
+移植的时候发现他会跳到0x80200020，所以需要改掉我代码里所有依赖0x80200000的地方，这个之后肯定需要支持不同的地址，不对，我发现他会智能跳过这段bl33的校检代码，所以不需要该任何地方，然后现在我的kernel输出乱码，然后我不知道为啥我用他的rustsbi编译的文件不会报错，但是用我单独clone的会报错，emmm，pull到最新的master就可以了
 
 ### 串口驱动
 
@@ -806,6 +806,16 @@ bl2是乱码，但是opensbi和uboot不是，这意味着opensbi和uboot使用�
 - KernelConsole里面封装了一个dyn的实现了ConsoleDevice trait的具体console的内存布局（比如uart16550的内存布局struct）
 
 然后要PLATFORM中还有一个BoardInfo，从设备树解析选择具体的console device（当然现在可以硬编码）
+
+ 之后发现打印不出来的东西，估计是串口的缓冲区满掉了，所以每次打印需要查看成功打印的次数，然后对于没有成功打印的再继续打印，最后我实现了用uart16550u8或sbi驱动qemu virt打印，以及用uart16550u32或sbi驱动milkv duo打印
+
+上述移植的过程确实是太恶心了，所以打算做一个视频来展示上述的过程
+
+## 视频展示
+
+第一次做视频，打算使用obs录屏+达芬奇剪辑，全部都是第一次接触，nixos没有aarch的达芬奇但是有obs
+
+首先是obs，开始先分几个sence，第零个是milkv-duo启动步骤的简单讲解，第一个我觉得是软件准备，首先是duo sdk的准备，一个简单软件的准备（最小kernel），你自己kernel的准备，中间可以穿插milkv-duo的启动过程的描述
 
 [^1]: rustup是The Rust tool chain installer
 

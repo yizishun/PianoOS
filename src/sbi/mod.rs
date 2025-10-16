@@ -20,7 +20,7 @@ pub fn shutdown(fail: bool) -> ! {
         sleep(1);
         sbi_rt::system_reset(Shutdown, NoReason);
     }
-    unreachable!()
+    loop {}
 }
 
 pub fn sleep(sec: i32) {
