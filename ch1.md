@@ -683,7 +683,7 @@ index 9a352403d..544fb5ea3 100644
 ```shell
 . /home/work/fsbl/build/cv1812cp_milkv_duo256m_sd/blmacros.env && \
 ./plat/cv181x/fiptool.py -v genfip \
-        '/home/work/fsbl/build/cv1812cp_milkv_duo256m_sd/fip.bin' \
+        './build/cv1812cp_milkv_duo256m_sd/fip.bin' \
         --MONITOR_RUNADDR="0x80000000" \
         --CHIP_CONF='./build/cv1812cp_milkv_duo256m_sd/chip_conf.bin' \
         --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' \
@@ -698,7 +698,7 @@ index 9a352403d..544fb5ea3 100644
         --compress='lzma'
 
 
-./plat/cv181x/fiptool.py -v genfip         '/home/work/fsbl/build/cv1812cp_milkv_duo256m_sd/fip.bin'         --MONITOR_RUNADDR="0x80000000"         --CHIP_CONF='./build/cv1812cp_milkv_duo256m_sd/chip_conf.bin'         --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF'         --NAND_INFO='00000000'        --BL2='./build/cv1812cp_milkv_duo256m_sd/bl2.bin'         --BLCP_IMG_RUNADDR=0x05200200         --BLCP_PARAM_LOADADDR=0         --BLCP=test/empty.bin         --DDR_PARAM='test/cv181x/ddr_param.bin'         --MONITOR='../rustsbi/target/riscv64gc-unknown-none-elf/release/rustsbi-prototyper-dynamic.bin'         --LOADER_2ND='../PianoOS.bin'         --compress='lzma'
+./plat/cv181x/fiptool.py -v genfip         './build/cv1812cp_milkv_duo256m_sd/fip.bin'         --MONITOR_RUNADDR="0x80000000"         --CHIP_CONF='./build/cv1812cp_milkv_duo256m_sd/chip_conf.bin'         --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF'         --NAND_INFO='00000000'        --BL2='./build/cv1812cp_milkv_duo256m_sd/bl2.bin'         --BLCP_IMG_RUNADDR=0x05200200         --BLCP_PARAM_LOADADDR=0         --BLCP=test/empty.bin         --DDR_PARAM='test/cv181x/ddr_param.bin'         --MONITOR='../rustsbi/target/riscv64gc-unknown-none-elf/release/rustsbi-prototyper-dynamic.bin'         --LOADER_2ND='../PianoOS.bin'         --compress='lzma'
 
 ./plat/cv181x/fiptool.py -v genfip \
         '/home/work/fsbl/build/cv1812cp_milkv_duo256m_sd/fip.bin' \
@@ -792,6 +792,20 @@ bl2是乱码，但是opensbi和uboot不是，这意味着opensbi和uboot使用�
 然后我打算看一下rcore第九章的某些内容学习一下
 
 感觉组织上来说，就是首先把他规划到一个叫做driver/chardev或者uart的mod下，然后定义一套类似trait/interface的东西，然后就是每种串口型号分不同的mod，他们都会实现这个trait，但是，他们的base addr需要从外部传入，类似于预制菜需要加热一样，然后还有一个叫做board的mod，他就相当于是成品，就是他规范了每个board所有的uart实现+base addr，使不使用这个成品都无所谓，但是其实本质上是要通过解析设备树和chosen来决定怎么选择实现和base addr
+
+然后qemu和milkv duo都是uart16550，但是qemu是u8，milkv是u32，所以他们的处理会稍微有点不一样
+
+看了一位大佬写的：[GitHub - YdrMaster/awesome-device: 一种外设定义的合集](https://github.com/YdrMaster/awesome-device)，感觉写的很好，在mmio下，设备驱动就是仅仅提供一个结构体+操作结构体的一系列方法，而对于结构体的内存映射和操作，都应该是系统来做的事情，所以我打算使用他的uart16550
+
+之后学了一下rustsbi的写法，然后分析一下他的层次
+
+- 首先是一个全局的PLATFORM变量，里面记录了所有的BoardDevice
+
+- BoardDevice里面有console这个抽象设备，他是一个KernelConsole
+
+- KernelConsole里面封装了一个dyn的实现了ConsoleDevice trait的具体console的内存布局（比如uart16550的内存布局struct）
+
+然后要PLATFORM中还有一个BoardInfo，从设备树解析选择具体的console device（当然现在可以硬编码）
 
 [^1]: rustup是The Rust tool chain installer
 

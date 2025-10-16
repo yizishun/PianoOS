@@ -1,6 +1,7 @@
 use log::{LevelFilter, Log, SetLoggerError, set_logger, set_max_level};
 use log::Level;
 use crate::sbi;
+use crate::println;
 
 struct PianoLogger;
 static PIANOLOGGER: PianoLogger = PianoLogger;

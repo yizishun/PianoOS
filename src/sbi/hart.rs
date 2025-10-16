@@ -1,5 +1,6 @@
 use log::error;
 use sbi_rt::SbiRet;
+use crate::print;
 
 pub enum HartState {
     Started,

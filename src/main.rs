@@ -6,6 +6,7 @@ use log::{info};
 
 use crate::{mm::heap::heap_init, platform::PLATFORM};
 
+mod driver;
 mod console;
 mod lang_items;
 mod sbi;
@@ -13,6 +14,7 @@ mod logging;
 mod devicetree;
 mod platform;
 mod mm;
+mod macros;
 
 extern crate alloc;
 
@@ -44,6 +46,12 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     unsafe {
         BOOT_HARTID = hartid;
     }
+    // SAFETY: PLATFORM infomation will be init once
+    #[allow(static_mut_refs)]
+    unsafe { 
+        PLATFORM.init(device_tree); 
+        info!("Cpu Number: {}", PLATFORM.board_info.cpu_num.unwrap());
+    }
     // 2. clear bss and heap init
     clear_bss();
     heap_init();
@@ -52,24 +60,16 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     info!("1.Logging system init success ------");
     info!("boot hartid: {}", hartid);
     info!("device tree addr: {:p}", device_tree as *const u8);
-    // 4. parse device tree
-    info!("2.Parsing DTB ----------------------");
-    // SAFETY: PLATFORM infomation will be init once
-    #[allow(static_mut_refs)]
-    unsafe { 
-        PLATFORM.init(device_tree); 
-        info!("Cpu Number: {}", PLATFORM.board_info.cpu_num);
-    }
-    // 5. boot hart prepare env for all harts
-    // 6. boot hart start other harts
-    // 7. print some kernel information
+    // 4. boot hart prepare env for all harts
+    // 5. boot hart start other harts
+    // 6. print some kernel information
     print_kernel_mem();
     info!("kernel hart number: {}", sbi::hart::get_hartnum());
     info!("kernel current hart state: {}", sbi::hart::get_cur_hart_state());
     (0..sbi::hart::get_hartnum()).for_each(|id|{
         info!("hart{}: {}", id, sbi::hart::get_hart_state(id))
     });
-    // 8. boot hart shutdown
+    // 7. boot hart shutdown
     sbi::shutdown(false);
 }
 

@@ -1,32 +1,51 @@
 #![macro_use]
-use crate::sbi;
+#![allow(static_mut_refs)]
 use core::fmt::{self, Write};
+use alloc::boxed::Box;
+use spin::Mutex;
 
-struct Stdout;
+use crate::platform::PLATFORM;
 
-impl fmt::Write for Stdout {
+pub enum ConsoleType {
+    Uart16550U8,
+    Uart16550U32,
+    RiscvSbi
+}
+
+/// console device driver should impl this trait 
+pub (in crate)trait ConsoleDevice {
+    /// read bytes from console input
+    fn read(&self, buf: &mut [u8]) -> usize;
+    /// write bytes to console output
+    fn write(&self, buf: &[u8]) -> usize;
+}
+
+pub struct KernelConsole {
+    inner: Mutex<Box<dyn ConsoleDevice>> //spinlock
+}
+
+impl KernelConsole {
+    pub fn new(inner: Mutex<Box<dyn ConsoleDevice>>) -> Self {
+        Self { inner }
+    }
+}
+
+impl fmt::Write for KernelConsole {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        s.chars().for_each(|c| {
-            sbi::console_putchar(c as usize);
-        });
-        Ok(())
+        let console = self.inner.lock();
+        let mut bytes = s.as_bytes();
+        while !bytes.is_empty() {
+            let count = console.write(bytes);
+            bytes = &bytes[count..];
+        }
+        Ok(()) //TODO: error handle
     }
 }
 
 pub fn print(args: fmt::Arguments) {
-    Stdout.write_fmt(args).unwrap();
+    unsafe {
+        PLATFORM.board_device.console.as_mut().unwrap()
+            .write_fmt(args).unwrap();
+    }
 }
 
-#[macro_export]
-macro_rules! print {
-    ($fmt: literal $(, $($arg: tt)+)?) => {
-        $crate::console::print(format_args!($fmt $(, $($arg)+)?))
-    };
-}
-
-#[macro_export]
-macro_rules! println {
-    ($fmt: literal $(, $($arg: tt)+)?) => {
-        $crate::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?))
-    };
-}
