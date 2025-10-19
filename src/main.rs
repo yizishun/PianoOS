@@ -2,14 +2,13 @@
 #![no_main]
 
 use core::arch::global_asm;
-use alloc::boxed::Box;
 use log::{info};
 
 use crate::{mm::heap::heap_init, platform::PLATFORM};
 
 mod driver;
 mod console;
-mod lang_items;
+mod error;
 mod sbi;
 mod logging;
 mod devicetree;
@@ -53,12 +52,12 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     // SAFETY: PLATFORM infomation will be init once
     #[allow(static_mut_refs)]
     unsafe { 
-        PLATFORM.init(device_tree); 
-        info!("Cpu Number: {}", PLATFORM.board_info.cpu_num.unwrap());
+        PLATFORM.init(device_tree).unwrap(); 
     }
     // 3. boot hart init loging system
     logging::init().expect("Logging System init fail");
     info!("1.Logging system init success ------");
+    unsafe {info!("Cpu Number: {}", PLATFORM.board_info.cpu_num.unwrap());}
     info!("boot hartid: {}", hartid);
     info!("device tree addr: {:p}", device_tree as *const u8);
     // 4. boot hart prepare env for all harts

@@ -6,10 +6,24 @@ use spin::Mutex;
 
 use crate::platform::PLATFORM;
 
+#[derive(Clone, Copy)]
 pub enum ConsoleType {
     Uart16550U8,
     Uart16550U32,
     RiscvSbi
+}
+
+impl ConsoleType {
+    pub fn compatible(device: &str) -> Option<ConsoleType>{
+        use ConsoleType::*;
+        if        ["ns16550a"].contains(&device) { 
+            Some(Uart16550U8)
+        } else if ["snps,dw-apb-uart"].contains(&device) {
+            Some(Uart16550U32)
+        } else {
+            None
+        }
+    }
 }
 
 /// console device driver should impl this trait 

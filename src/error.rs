@@ -1,6 +1,6 @@
 use core::panic::PanicInfo;
 
-use crate::sbi;
+use crate::{devicetree::ParseDeviceTreeError, sbi};
 use log::error;
 
 #[panic_handler]
@@ -17,4 +17,15 @@ fn panic(_info: &PanicInfo) -> ! {
         error!("Panic due to {}", _info.message());
     }
     sbi::shutdown(true);
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum KernelError {
+    DeviceTree(ParseDeviceTreeError)
+}
+
+impl From<ParseDeviceTreeError> for KernelError {
+    fn from(value: ParseDeviceTreeError) -> Self {
+        Self::DeviceTree(value)
+    }
 }

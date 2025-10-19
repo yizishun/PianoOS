@@ -4,13 +4,6 @@ use crate::FREQUNCY;
 use log::info;
 use riscv::register::{time, sie};
 
-pub fn console_putchar(c: usize) {
-    //TODO: error handling
-    c.to_le_bytes().iter().for_each(|c_bytes| {
-        sbi_rt::console_write_byte(*c_bytes);
-    });
-}
-
 pub fn shutdown(fail: bool) -> ! {
     use sbi_rt::{NoReason, Shutdown, SystemFailure};
     if fail {
