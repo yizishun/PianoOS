@@ -3,8 +3,9 @@
 
 use core::arch::global_asm;
 use log::{info};
+use serde::de;
 
-use crate::{mm::heap::heap_init, platform::PLATFORM};
+use crate::{mm::heap::heap_init, platform::{Platform, PLATFORM}};
 
 mod driver;
 mod console;
@@ -50,14 +51,14 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     clear_bss();
     heap_init();
     // SAFETY: PLATFORM infomation will be init once
-    #[allow(static_mut_refs)]
-    unsafe { 
-        PLATFORM.init(device_tree).unwrap(); 
-    }
+    PLATFORM.call_once(|| {
+        Platform::init_platform(device_tree)
+            .unwrap()
+    });
     // 3. boot hart init loging system
     logging::init().expect("Logging System init fail");
     info!("1.Logging system init success ------");
-    unsafe {info!("Cpu Number: {}", PLATFORM.board_info.cpu_num.unwrap());}
+    info!("Cpu Number: {}", PLATFORM.get().unwrap().board_info.cpu_num.unwrap());
     info!("boot hartid: {}", hartid);
     info!("device tree addr: {:p}", device_tree as *const u8);
     // 4. boot hart prepare env for all harts

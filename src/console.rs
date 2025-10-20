@@ -27,7 +27,7 @@ impl ConsoleType {
 }
 
 /// console device driver should impl this trait 
-pub (in crate)trait ConsoleDevice {
+pub (in crate)trait ConsoleDevice: Send {
     /// read bytes from console input
     fn read(&self, buf: &mut [u8]) -> usize;
     /// write bytes to console output
@@ -44,7 +44,7 @@ impl KernelConsole {
     }
 }
 
-impl fmt::Write for KernelConsole {
+impl fmt::Write for &KernelConsole {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let console = self.inner.lock();
         let mut bytes = s.as_bytes();
@@ -57,9 +57,12 @@ impl fmt::Write for KernelConsole {
 }
 
 pub fn print(args: fmt::Arguments) {
-    unsafe {
-        PLATFORM.board_device.console.as_mut().unwrap()
-            .write_fmt(args).unwrap();
-    }
+    PLATFORM
+        .get()
+        .unwrap()
+        .board_device.console
+        .as_ref()
+        .unwrap()
+        .write_fmt(args).unwrap();
 }
 

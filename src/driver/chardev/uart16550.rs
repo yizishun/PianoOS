@@ -23,3 +23,5 @@ impl<R: Register> ConsoleDevice for Uart16550Wrapper<R> {
         unsafe { (*self.inner).write(buf) }
     }
 }
+
+unsafe impl<R: Register> Send for Uart16550Wrapper<R>{}

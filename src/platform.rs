@@ -12,6 +12,7 @@ use crate::error::KernelError;
 use alloc::boxed::Box;
 use serde_device_tree::buildin::Node;
 use spin::mutex::Mutex;
+use spin::Once;
 
 pub type BaseAddr = usize;
 
@@ -54,7 +55,8 @@ impl Platform {
         }
     }
 
-    pub fn init(&mut self, dtb_addr: usize) -> Result<(), KernelError>{
+    pub fn init_platform(dtb_addr: usize) -> Result<Self, KernelError>{
+        let mut plat = Platform::new();
         let dtb = parse_device_tree(dtb_addr)
             .unwrap_or_else(|_| panic!("parse dtb error"))
             .share();
@@ -62,37 +64,21 @@ impl Platform {
             .unwrap_or_else(|_| panic!("deserialze dtb fail"));
         let tree: Tree = root.deserialize();
 
-        self.init_board_info(&tree, &root)?;
+        plat.board_info = Self::init_board_info(&tree, &root)?;
 
-        self.init_board_device();
+        plat.board_device = Self::init_board_device(&plat.board_info);
 
-        Ok(())
+        Ok(plat)
     }
 
-    fn init_board_device(&mut self) {
-        self.board_device.console = self.init_console();
+    fn init_board_info(tree: &Tree, root: &Node) -> Result<BoardInfo, ParseDeviceTreeError>{
+        let mut board_info = BoardInfo::new();
+        board_info.cpu_num = Some(tree.cpus.cpu.len());
+        board_info.console = Self::init_console_info(root)?;
+        Ok(board_info)
     }
 
-    fn init_console(&mut self) -> Option<KernelConsole> {
-        let Some((base, console_type)) = self.board_info.console else {
-            return None;
-        };
-        let console: Box<dyn ConsoleDevice> = match console_type {
-            ConsoleType::Uart16550U8 => Box::new(Uart16550Wrapper::<u8>::new(base)),
-            ConsoleType::Uart16550U32 => Box::new(Uart16550Wrapper::<u32>::new(base)),
-            ConsoleType::RiscvSbi => Box::new(RiscvSbi)
-        };
-        Some(KernelConsole::new(Mutex::new(console)))
-    }
-
-    fn init_board_info(&mut self, tree: &Tree, root: &Node) -> Result<(), ParseDeviceTreeError>{
-        self.board_info.cpu_num = Some(tree.cpus.cpu.len());
-        self.board_info.console = self.init_console_info(root)?;
-        Ok(())
-    }
-
-    fn init_console_info(
-        &mut self, 
+    fn init_console_info( 
         root: &Node
     ) -> Result<Option<(BaseAddr, ConsoleType)>, ParseDeviceTreeError> {
         let Some(stdout_path) = root.chosen_stdout_path() else {
@@ -110,7 +96,25 @@ impl Platform {
                 .map(|ctype| (reg.start, ctype))
         )
     }
+
+    fn init_board_device(board_info: &BoardInfo) -> BoardDevice{
+        let mut board_device = BoardDevice::new();
+        board_device.console = Self::init_console(&board_info);
+        board_device
+    }
+
+    fn init_console(board_info: &BoardInfo) -> Option<KernelConsole> {
+        let Some((base, console_type)) = board_info.console else {
+            return None;
+        };
+        let console: Box<dyn ConsoleDevice> = match console_type {
+            ConsoleType::Uart16550U8 => Box::new(Uart16550Wrapper::<u8>::new(base)),
+            ConsoleType::Uart16550U32 => Box::new(Uart16550Wrapper::<u32>::new(base)),
+            ConsoleType::RiscvSbi => Box::new(RiscvSbi)
+        };
+        Some(KernelConsole::new(Mutex::new(console)))
+    }
     
 }
 
-pub static mut PLATFORM: Platform = Platform::new();
+pub static PLATFORM: Once<Platform> = Once::new();
