@@ -9,7 +9,7 @@ use crate::{mm::heap::heap_init, platform::PLATFORM};
 mod driver;
 mod console;
 mod error;
-mod sbi;
+mod arch;
 mod logging;
 mod devicetree;
 mod platform;
@@ -18,7 +18,7 @@ mod macros;
 
 extern crate alloc;
 
-global_asm!(include_str!("entry.asm"));
+global_asm!(include_str!("arch/riscv/entry.asm")); //TODO
 unsafe extern "C" {
     static skernel: usize;
     static stext: usize;
@@ -64,13 +64,13 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     // 5. boot hart start other harts
     // 6. print some kernel information
     print_kernel_mem();
-    info!("kernel hart number: {}", sbi::hart::get_hartnum());
-    info!("kernel current hart state: {}", sbi::hart::get_cur_hart_state());
-    (0..sbi::hart::get_hartnum()).for_each(|id|{
-        info!("hart{}: {}", id, sbi::hart::get_hart_state(id))
+    info!("kernel hart number: {}", arch::riscv::hart::get_hartnum());
+    info!("kernel current hart state: {}", arch::riscv::hart::get_cur_hart_state());
+    (0..arch::riscv::hart::get_hartnum()).for_each(|id|{
+        info!("hart{}: {}", id, arch::riscv::hart::get_hart_state(id))
     });
     // 7. boot hart shutdown
-    sbi::shutdown(false);
+    arch::riscv::shutdown(false);
 }
 
 fn clear_bss() {

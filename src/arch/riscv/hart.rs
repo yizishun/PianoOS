@@ -1,6 +1,6 @@
 use log::error;
 use sbi_rt::SbiRet;
-use crate::print;
+use crate::{platform::PLATFORM, print};
 
 pub enum HartState {
     Started,
@@ -28,9 +28,7 @@ pub fn get_cur_hartid() -> usize {
 }
 
 pub fn get_hartnum() -> usize {
-    (0..).take_while(|h| {
-        sbi_rt::hart_get_status(*h).error == SbiRet::success(0).error
-    }).count()
+    0
 }
 
 pub fn get_cur_hart_state() -> HartState {

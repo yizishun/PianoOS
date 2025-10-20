@@ -1,6 +1,6 @@
 use core::panic::PanicInfo;
 
-use crate::{devicetree::ParseDeviceTreeError, sbi};
+use crate::{devicetree::ParseDeviceTreeError, arch::riscv};
 use log::error;
 
 #[panic_handler]
@@ -16,7 +16,7 @@ fn panic(_info: &PanicInfo) -> ! {
     } else {
         error!("Panic due to {}", _info.message());
     }
-    sbi::shutdown(true);
+    riscv::shutdown(true);
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
