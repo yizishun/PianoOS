@@ -3,10 +3,11 @@
 
 use core::arch::global_asm;
 use log::{info};
-use serde::de;
+use spin::Once;
 
 use crate::{mm::heap::heap_init, platform::{Platform, PLATFORM}};
 
+mod config;
 mod driver;
 mod console;
 mod error;
@@ -19,7 +20,6 @@ mod macros;
 
 extern crate alloc;
 
-global_asm!(include_str!("arch/riscv/entry.asm")); //TODO
 unsafe extern "C" {
     static skernel: usize;
     static stext: usize;
@@ -28,8 +28,8 @@ unsafe extern "C" {
     static erodata: usize;
     static sdata: usize;
     static edata: usize;
-    static boot_stack_lower_bound: usize;
-    static boot_stack_top: usize;
+    static sstack: usize;
+    static estack: usize;
     static sheap: usize;
     static eheap: usize;
     static sbss: usize;
@@ -37,30 +37,26 @@ unsafe extern "C" {
     static ekernel: usize;
 }
 
-const FREQUNCY: i32 = 10;
-static mut BOOT_HARTID: usize = 0;
+static BOOT_HARTID: Once<usize> = spin::Once::new();
 
 #[unsafe(no_mangle)]
 extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     // 1. get boot hartid and device tree addr 
-    // SAFETY: boot_hartid will be assign once at boot time
-    unsafe {
-        BOOT_HARTID = hartid;
-    }
+    BOOT_HARTID.call_once(|| hartid);
     // 2. clear bss and heap init
     clear_bss();
     heap_init();
-    // SAFETY: PLATFORM infomation will be init once
+    // 3. parse device tree and init platform
     PLATFORM.call_once(|| {
         Platform::init_platform(device_tree)
             .unwrap()
     });
-    // 3. boot hart init loging system
+    // 4. logging system init and print some infomation
     logging::init().expect("Logging System init fail");
-    info!("1.Logging system init success ------");
-    info!("Cpu Number: {}", PLATFORM.get().unwrap().board_info.cpu_num.unwrap());
+    info!("Logging system init success");
     info!("boot hartid: {}", hartid);
     info!("device tree addr: {:p}", device_tree as *const u8);
+    PLATFORM.get().unwrap().print_platform_info();
     // 4. boot hart prepare env for all harts
     // 5. boot hart start other harts
     // 6. print some kernel information
@@ -92,7 +88,7 @@ fn print_kernel_mem() {
         info!(".text     : [{:<10p}, {:<10p}]", &stext, &etext);
         info!(".rodata   : [{:<10p}, {:<10p}]", &srodata, &erodata);
         info!(".data     : [{:<10p}, {:<10p}]", &sdata, &edata);
-        info!(".bss.stack: [{:<10p}, {:<10p}]", &boot_stack_lower_bound, &boot_stack_top);
+        info!(".bss.stack: [{:<10p}, {:<10p}]", &sstack, &estack);
         info!(".bss.heap : [{:<10p}, {:<10p}]", &sheap, &eheap);
         info!(".bss      : [{:<10p}, {:<10p}]", &sbss, &ebss);
         info!("kernel end = {:<10p}", &ekernel);

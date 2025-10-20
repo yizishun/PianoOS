@@ -28,12 +28,12 @@ pub fn get_cur_hartid() -> usize {
 }
 
 pub fn get_hartnum() -> usize {
-    0
+    PLATFORM.get().unwrap().board_info.cpu_num.unwrap()
 }
 
 pub fn get_cur_hart_state() -> HartState {
-    use sbi_rt::{get_marchid, hart_get_status};
-    match hart_get_status(get_marchid()).value {
+    use sbi_rt::hart_get_status;
+    match hart_get_status(get_cur_hartid()).value {
         0 => HartState::Started,
         1 => HartState::Stoped,
         2 => HartState::StartPeding,

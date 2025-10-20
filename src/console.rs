@@ -6,7 +6,7 @@ use spin::Mutex;
 
 use crate::platform::PLATFORM;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum ConsoleType {
     Uart16550U8,
     Uart16550U32,

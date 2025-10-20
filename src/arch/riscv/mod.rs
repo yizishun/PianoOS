@@ -1,6 +1,7 @@
 pub mod hart;
+pub mod entry;
 
-use crate::FREQUNCY;
+use crate::config::FREQUNCY;
 use log::info;
 use riscv::register::{time, sie};
 

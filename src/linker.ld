@@ -31,7 +31,9 @@ SECTIONS
     edata = .;
 
     .bss : {
+        sstack = .;
         *(.bss.stack)
+        estack = .;
         sheap = .;
         *(.bss.heap)
         eheap = .;

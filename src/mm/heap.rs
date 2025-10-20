@@ -1,5 +1,5 @@
-const KERNEL_HEAP_SIZE: usize = 32 * 1024; //TODO:place config in a config file
 use buddy_system_allocator::LockedHeap;
+use crate::config::KERNEL_HEAP_SIZE;
 
 #[unsafe(link_section = ".bss.heap")]
 static mut HEAP: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];

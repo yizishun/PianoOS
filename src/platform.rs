@@ -10,6 +10,7 @@ use crate::console::ConsoleType;
 use crate::error::KernelError;
 
 use alloc::boxed::Box;
+use log::info;
 use serde_device_tree::buildin::Node;
 use spin::mutex::Mutex;
 use spin::Once;
@@ -113,6 +114,11 @@ impl Platform {
             ConsoleType::RiscvSbi => Box::new(RiscvSbi)
         };
         Some(KernelConsole::new(Mutex::new(console)))
+    }
+
+    pub fn print_platform_info(&self) {
+        info!("cpu number: {}", self.board_info.cpu_num.unwrap());
+        info!("uart type is {:#?}, base addr is 0x{:X}", self.board_info.console.unwrap().1, self.board_info.console.unwrap().0)
     }
     
 }
