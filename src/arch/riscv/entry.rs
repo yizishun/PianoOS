@@ -1,5 +1,6 @@
 use core::arch::naked_asm;
 use crate::{config::KERNEL_STACK_SIZE_PER_HART, mm::stack::STACK};
+use crate::arch::{HART_INFO, HART_INFO_SIZE};
 
 #[unsafe(naked)]
 #[unsafe(link_section = ".text.entry")]
@@ -27,9 +28,57 @@ unsafe extern "C" fn start() -> ! {
          1: add sp, sp, t0
             addi t1, t1, -1
             bnez t1, 1b
+            
+            la t2, {hart_info}
+            li t0, {hart_info_size}
+            addi t1, a0, 0
+         2:
+            beqz t1, 3f 
+            add t2, t2, t0
+            addi t1, t1, -1
+            j 2b
+         3: 
+            csrw sscratch, t2
             call rust_main
         ",
         stack = sym STACK,
-        per_hart_stack_size = const KERNEL_STACK_SIZE_PER_HART
+        per_hart_stack_size = const KERNEL_STACK_SIZE_PER_HART,
+        hart_info = sym HART_INFO,
+        hart_info_size = const HART_INFO_SIZE
+    )
+}
+
+#[unsafe(naked)]
+#[unsafe(export_name = "hart_start")]
+pub unsafe extern "C" fn hart_start() -> ! {
+    naked_asm!(
+        "hart_real_start:
+            //init stack(sp)
+            la sp, {stack}
+            li t0, {per_hart_stack_size}
+            addi t1, a0, 0                 //get boot hart id
+            addi t1, t1, 1
+         1: add sp, sp, t0
+            addi t1, t1, -1
+            bnez t1, 1b",
+
+            "
+            //init hart context(sscratch)
+            la t2, {hart_info}
+            li t0, {hart_info_size}
+            addi t1, a0, 0
+         2:
+            beqz t1, 3f 
+            add t2, t2, t0
+            addi t1, t1, -1
+            j 2b
+         3: 
+            csrw sscratch, t2
+            call hart_main
+        ",
+        stack = sym STACK,
+        per_hart_stack_size = const KERNEL_STACK_SIZE_PER_HART,
+        hart_info = sym HART_INFO,
+        hart_info_size = const HART_INFO_SIZE
     )
 }

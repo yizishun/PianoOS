@@ -1,6 +1,8 @@
+use core::arch::asm;
+
 use log::error;
 use sbi_rt::SbiRet;
-use crate::{platform::PLATFORM, print};
+use crate::{arch::HartInfo, platform::PLATFORM, print};
 
 pub enum HartState {
     Started,
@@ -24,11 +26,21 @@ impl core::fmt::Display for HartState {
 }
 
 pub fn get_cur_hartid() -> usize {
-    0
+    let hart_info_addr: usize;
+    unsafe { 
+        asm!("csrr {}, sscratch", out(reg) hart_info_addr);
+    }
+    let hart_info = hart_info_addr as *const HartInfo;
+    unsafe {
+        (*hart_info).hartid
+    }
 }
 
 pub fn get_hartnum() -> usize {
-    PLATFORM.get().unwrap().board_info.cpu_num.unwrap()
+     (0..).take_while(|h| {
+        sbi_rt::hart_get_status(*h).error == SbiRet::success(0).error
+    }).count()
+    //PLATFORM.get().unwrap().board_info.cpu_num.unwrap()
 }
 
 pub fn get_cur_hart_state() -> HartState {
