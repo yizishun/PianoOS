@@ -24,7 +24,7 @@ OBJCOPY := rust-objcopy --binary-architecture=riscv64
 GDB := riscv64-none-elf-gdb
 
 #Qemu
-QEMU_ARGS := -smp 2 \
+QEMU_ARGS := -smp 8 \
 			 -machine virt \
 			 -nographic \
 			 -bios $(BOOTLOADER) \

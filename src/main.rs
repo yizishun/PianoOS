@@ -6,6 +6,7 @@ use log::{info};
 use spin::Once;
 
 use crate::{arch::HartInfo, mm::heap::heap_init, platform::{Platform, PLATFORM}};
+use arch::HART_INFO;
 
 mod config;
 mod driver;
@@ -43,9 +44,17 @@ static BOOT_HARTID: Once<usize> = spin::Once::new();
 extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     // 1. get boot hartid and device tree addr 
     BOOT_HARTID.call_once(|| hartid);
-    // 2. clear bss and heap init
+    // 2. clear bss, heap init and hart info init
     clear_bss();
     heap_init();
+    unsafe {
+        #[allow(static_mut_refs)]
+        for (i, h) in (&mut HART_INFO).iter_mut().enumerate() {
+            *h = HartInfo {
+                hartid: i
+            };
+        }
+    }
     // 3. parse device tree and init platform
     PLATFORM.call_once(|| {
         Platform::init_platform(device_tree)
@@ -58,15 +67,6 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     info!("device tree addr: {:p}", device_tree as *const u8);
     PLATFORM.get().unwrap().print_platform_info();
     // 5. boot hart start other harts
-    unsafe {
-        use arch::HART_INFO;
-        #[allow(static_mut_refs)]
-        for (i, h) in (&mut HART_INFO).iter_mut().enumerate() {
-            *h = HartInfo {
-                hartid: i
-            };
-        }
-    }
     for i in 0..arch::riscv::hart::get_hartnum() {
         let start_addr = arch::riscv::entry::hart_start as usize;
         sbi_rt::hart_start(i, start_addr, 0);
