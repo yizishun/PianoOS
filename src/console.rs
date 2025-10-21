@@ -3,6 +3,7 @@
 use core::fmt::{self, Write};
 use alloc::boxed::Box;
 use spin::Mutex;
+use alloc::string::String;
 
 use crate::platform::PLATFORM;
 
@@ -56,13 +57,15 @@ impl fmt::Write for &KernelConsole {
     }
 }
 
-pub fn print(args: fmt::Arguments) {
+pub fn print(args: fmt::Arguments){
+    let mut s = String::new();
+    let _ =  core::fmt::write(&mut s, args); //TODO: error handle
     PLATFORM
         .get()
         .unwrap()
         .board_device.console
         .as_ref()
         .unwrap()
-        .write_fmt(args).unwrap();
+        .write_str(&s).unwrap();
 }
 

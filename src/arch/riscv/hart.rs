@@ -2,7 +2,7 @@ use core::arch::asm;
 
 use log::error;
 use sbi_rt::SbiRet;
-use crate::{arch::HartInfo, platform::PLATFORM, print};
+use crate::{arch::HartInfo};
 
 pub enum HartState {
     Started,
@@ -13,15 +13,14 @@ pub enum HartState {
 }
 
 impl core::fmt::Display for HartState {
-    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            HartState::Started => print!("Hart is Started"),
-            HartState::Stoped => print!("Hart is Stoped"),
-            HartState::StartPeding => print!("Hart is Start pending"),
-            HartState::StopPeding => print!("Hart is Stop pending"),
-            HartState::Invalid => print!("Hart is Invalid"),
+            HartState::Started => write!(f, "Hart is Started"),
+            HartState::Stoped => write!(f, "Hart is Stoped"),
+            HartState::StartPeding => write!(f, "Hart is Start pending"),
+            HartState::StopPeding => write!(f, "Hart is Stop pending"),
+            HartState::Invalid => write!(f, "Hart is Invalid"),
         }
-        Ok(())
     }
 }
 
