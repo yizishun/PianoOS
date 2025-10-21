@@ -1,6 +1,6 @@
 use core::arch::naked_asm;
 use crate::{config::KERNEL_STACK_SIZE_PER_HART, mm::stack::STACK};
-use crate::arch::{HART_INFO, HART_INFO_SIZE};
+use crate::arch::hart::{HART_INFO, HART_INFO_SIZE};
 
 #[unsafe(naked)]
 #[unsafe(link_section = ".text.entry")]

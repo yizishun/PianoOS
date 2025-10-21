@@ -5,8 +5,8 @@ use core::arch::global_asm;
 use log::{info};
 use spin::Once;
 
-use crate::{arch::HartInfo, mm::heap::heap_init, platform::{Platform, PLATFORM}};
-use arch::HART_INFO;
+use crate::{arch::hart::HartInfo, mm::heap::heap_init, platform::{Platform, PLATFORM}};
+use arch::hart::HART_INFO;
 
 mod config;
 mod driver;
@@ -50,9 +50,7 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     unsafe {
         #[allow(static_mut_refs)]
         for (i, h) in (&mut HART_INFO).iter_mut().enumerate() {
-            *h = HartInfo {
-                hartid: i
-            };
+            *h = HartInfo::new(i);
         }
     }
     // 3. parse device tree and init platform
@@ -67,14 +65,15 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     info!("device tree addr: {:p}", device_tree as *const u8);
     PLATFORM.get().unwrap().print_platform_info();
     // 5. boot hart start other harts
-    for i in 0..arch::riscv::hart::get_hartnum() {
+    let cur_hart = HartInfo::get_cur_hart();
+    for i in 0..HartInfo::get_hartnum() {
         let start_addr = arch::riscv::entry::hart_start as usize;
         sbi_rt::hart_start(i, start_addr, 0);
     }
     // 6. print some kernel information
     print_kernel_mem();
-    info!("kernel current hart state: {}", arch::riscv::hart::get_cur_hart_state());
-    (0..arch::riscv::hart::get_hartnum()).for_each(|id|{
+    info!("kernel current hart state: {}", cur_hart.get_cur_hart_state());
+    (0..HartInfo::get_hartnum()).for_each(|id|{
         info!("hart{}: {}", id, arch::riscv::hart::get_hart_state(id))
     });
     // 7. boot hart shutdown
