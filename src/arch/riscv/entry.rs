@@ -1,3 +1,4 @@
+#![cfg(target_arch = "riscv64")]
 use core::arch::naked_asm;
 use crate::{config::KERNEL_STACK_SIZE_PER_HART, mm::stack::STACK};
 use crate::arch::hart::{HART_INFO, HART_INFO_SIZE};

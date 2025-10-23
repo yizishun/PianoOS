@@ -67,17 +67,17 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     // 5. boot hart start other harts
     let cur_hart = HartInfo::get_cur_hart();
     for i in 0..HartInfo::get_hartnum() {
-        let start_addr = arch::riscv::entry::hart_start as usize;
+        let start_addr = arch::entry::hart_start as usize;
         sbi_rt::hart_start(i, start_addr, 0);
     }
     // 6. print some kernel information
     print_kernel_mem();
     info!("kernel current hart state: {}", cur_hart.get_cur_hart_state());
     (0..HartInfo::get_hartnum()).for_each(|id|{
-        info!("hart{}: {}", id, arch::riscv::hart::get_hart_state(id))
+        info!("hart{}: {}", id, arch::hart::get_hart_state(id))
     });
     // 7. boot hart shutdown
-    arch::riscv::shutdown(false);
+    arch::shutdown(false);
 }
 
 #[unsafe(no_mangle)]

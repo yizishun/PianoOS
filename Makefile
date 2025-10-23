@@ -1,44 +1,65 @@
-# Building
-TARGET := riscv64gc-unknown-none-elf
-MODE := debug
-KERNEL_ELF := target/$(TARGET)/$(MODE)/PianoOS
-KERNEL_BIN := $(KERNEL_ELF).bin
-DISASM_TMP := target/$(TARGET)/$(MODE)/asm
+# ========= Config =========
+ARCH ?= riscv
+MODE ?= debug
 
-# Building mode argument
+# Kernel entry
+KERNEL_ENTRY_PA ?= 0x80200000
+
+# ========= Per-ARCH Settings =========
+ifeq ($(ARCH), riscv)
+TARGET        := riscv64gc-unknown-none-elf
+QEMU_NAME     := qemu-system-riscv64
+# SBI/Bootloader（示例：RustSBI on QEMU virt）
+SBI           ?= rustsbi
+BOARD         ?= qemu
+BOOTLOADER    := ./bootloader/$(SBI)-$(BOARD).bin
+
+# Binutils
+OBJDUMP       := rust-objdump --arch-name=riscv64
+OBJCOPY       := rust-objcopy --binary-architecture=riscv64
+GDB           := riscv64-none-elf-gdb
+
+# QEMU
+QEMU_ARGS     = -smp 8 \
+                 -machine virt \
+                 -nographic \
+                 -bios $(BOOTLOADER) \
+                 -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA)
+
+else ifeq ($(ARCH), loongarch)
+TARGET        := loongarch64-unknown-none
+QEMU_NAME     := qemu-system-loongarch64
+# LoongArch 裸机一般没有 SBI，这里用 device loader 直接装入二进制
+# 如需固件/BootROM，可自行设置 -bios <path>，此处用 -bios none
+BOOTLOADER    :=
+OBJDUMP       := rust-objdump --arch-name=loongarch64
+OBJCOPY       := rust-objcopy --binary-architecture=loongarch64
+GDB           := loongarch64-unknown-linux-gnu-gdb
+
+QEMU_ARGS     = -smp 8 \
+                 -machine virt \
+                 -nographic \
+								 -kernel $(KERNEL_ELF)
+else
+$(error Unsupported ARCH=$(ARCH). Use 'riscv' or 'loongarch')
+endif
+
+# ========= Cargo/Paths =========
+MODE_ARG      :=
 ifeq ($(MODE), release)
 	MODE_ARG := --release
 endif
 
-# BOARD
-BOARD := qemu
-SBI ?= rustsbi
-BOOTLOADER := ./bootloader/$(SBI)-$(BOARD).bin
+KERNEL_ELF    := target/$(TARGET)/$(MODE)/PianoOS
+KERNEL_BIN    := $(KERNEL_ELF).bin
+DISASM_TMP    := target/$(TARGET)/$(MODE)/asm
 
-# Kernel
-KERNEL_ENTRY_PA := 0x80200000
-
-# Binutils
-OBJDUMP := rust-objdump --arch-name=riscv64
-OBJCOPY := rust-objcopy --binary-architecture=riscv64
-GDB := riscv64-none-elf-gdb
-
-#Qemu
-QEMU_ARGS := -smp 8 \
-			 -machine virt \
-			 -nographic \
-			 -bios $(BOOTLOADER) \
-			 -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA)
-QEMU_NAME := qemu-system-riscv64
-
+# ========= Rules =========
 $(KERNEL_ELF):
-	cargo build $(MODE_ARG)
+	cargo build $(MODE_ARG) --target $(TARGET)
+
 $(KERNEL_BIN): $(KERNEL_ELF)
-	$(OBJCOPY) \
-	--strip-all \
-	$(KERNEL_ELF) \
-	-O binary \
-	$(KERNEL_BIN)
+	$(OBJCOPY) --strip-all $(KERNEL_ELF) -O binary $(KERNEL_BIN)
 
 .PHONY: build
 build: $(KERNEL_BIN)
@@ -61,12 +82,22 @@ qemu:
 
 .PHONY: gdbserver gdbclient
 gdbserver: build
-	qemu-system-riscv64 $(QEMU_ARGS) -s -S
+	$(QEMU_NAME) $(QEMU_ARGS) -s -S
 
 gdbclient:
 	$(GDB) \
 	-ex 'file $(KERNEL_ELF)' \
-	-ex 'set arch riscv:rv64' \
+	-ex 'set arch $(if $(filter $(ARCH),riscv),riscv:rv64,loongarch64)' \
 	-ex 'target remote localhost:1234' \
 	-ex 'layout asm' \
 	-tui
+
+# ========= Usage =========
+# 默认 RISC-V 调试构建并运行：
+#   make run
+# RISC-V 发布构建：
+#   make MODE=release build
+# LoongArch 调试构建并运行：
+#   make ARCH=loongarch run
+# LoongArch 反汇编：
+#   make ARCH=loongarch disasm

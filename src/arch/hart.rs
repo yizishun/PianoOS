@@ -1,5 +1,7 @@
 #[cfg(target_arch = "riscv64")]
-pub use crate::arch::riscv::hart;
+pub use crate::arch::riscv::hart::*;
+#[cfg(target_arch = "loongarch64")]
+pub use crate::arch::loongarch64::hart::*;
 
 use crate::config::NUM_HART_MAX;
 
@@ -24,7 +26,9 @@ impl HartInfo {
 
     pub fn get_cur_hart() -> &'static Self {
         #[cfg(target_arch = "riscv64")]
-        hart::get_cur_hart()
+        { super::riscv::hart::get_cur_hart() }
+        #[cfg(target_arch = "loongarch64")]
+        { super::riscv::hart::get_cur_hart() }
     }
     pub fn get_hart_by_id(hartid: usize) -> &'static Self {
         unsafe { &HART_INFO[hartid] }
@@ -36,7 +40,9 @@ impl HartInfo {
 
     pub fn get_cur_hart_state(&self) -> HartState {
         #[cfg(target_arch = "riscv64")]
-        hart::get_hart_state(self.hartid)
+        { super::riscv::hart::get_hart_state(self.hartid) }
+        #[cfg(target_arch = "loongarch64")]
+        { super::riscv::hart::get_hart_state(self.hartid) }
     }
 }
 
