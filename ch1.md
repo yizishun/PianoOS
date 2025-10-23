@@ -1,7 +1,5 @@
 # CH1 应用程序与基本执行环境
 
-## 
-
 ## 应用程序执行环境与平台支持
 
 首先我第一次知道三元组的概念，比如
@@ -489,6 +487,28 @@ emm，打算抄袭一下rustsbi中解析设备树的实现（等我实现完我�
 
 直接提前读第四章：[Rust 中的动态内存分配 - rCore-Tutorial-Book-v3 3.6.0-alpha.1 文档](https://rcore-os.cn/rCore-Tutorial-Book-v3/chapter4/1rust-dynamic-allocation.html?highlight=global)
 
+在完成下面章节：在真实硬件上跑我的os之后再继续完成当前多核启动问题
+
+打算看一下rustsbi的设备树解析的原理，至少要知道怎么使用，这部分写的时候忘记写了，总之就是使用rustsbi组织下的一个设备树反序列化crate
+
+然后到这里我可以完全知道这个设备的内容了
+
+然后之后就是boot hart为其他hart创建运行时环境，运行时环境感觉其实就只有stack，heap是共享的，其他内存环境全都是共享的包括mmio，所以说这些共享的东西需要进行多线程管理，heap就由分配器进行管理，一些只读的数据和代码并不需要管理，然后就是一些全局变量，这些变量是需要我自行管理的
+
+所以学习一下rustsbi的做法，先创建一个stack的数据类型，然后首先在start中初始化boot stack，然后在main中，boot hart将全局变量，设备等进行初始化之后，就开始初始化hart，他帮忙初始化一段内存区域，这段内存区域保存着每个hart专属的信息，并且在一开始，所有hart（包括boot hart），会将sscratch指向各自的区域，之后boot hart通过调用sbi给的hart_start，开启所有的hart，所有的hart会进入相同的hart_start中，初始化自己的stack和hart info，然后跳到hart_main中，在hart_main中打印一句话之后进入死循环
+
+之后发现成功打印了，但是他们两个hart使用串口的顺序比较奇怪，他们容易竞争这个uart，导致两个人打印的消息混在一起了，是不是需要将打印的部分变成原子的？
+
+我发现本质的问题是我是在write_str这个层面上获得的uart的锁，但是在print时调用的write_fmt可能会用for循环调用write_str，导致这个顺序会冲突，但是我理应当在print层面获得锁，然后我发现，并不是只有write_fmt会帮我format，我想要的其实只有将fmt转化为str的这个过程，于是我使用write函数，将fmt转化为str并写入一个String中，然后一次性调用write_str写入，成功解决问题
+
+## 跨平台
+
+之后还有一个小需求，就是跨平台，我至少需要他在riscv和la上跑起来，从而能让我的代码完全消除平台特化，让核心的kernel不会存在平台特化代码，我首先对于hart作了抽象层，其实最主要的就是在实现代码中使用了`#[cfg(target_arch = "riscv64")]`，来在编译时选择相应架构的代码，然后出了hart的一些操作，还存在某些特化代码，如下：entry部分代码，shutdown，sleep，需要全部进行抽象，在实现时用cfg来条件编译
+
+暂时有点不想写la，于是做了一层抽象之后就用todo!替代实现了
+
+
+
 ## 真实硬件：milkv duo256m
 
 在做challenge的时候新开了一个坑，用的是没有多hart boot的kernel
@@ -816,6 +836,8 @@ bl2是乱码，但是opensbi和uboot不是，这意味着opensbi和uboot使用�
 第一次做视频，打算使用obs录屏+达芬奇剪辑，全部都是第一次接触，nixos没有aarch的达芬奇但是有obs
 
 首先是obs，开始先分几个sence，第零个是milkv-duo启动步骤的简单讲解，第一个我觉得是软件准备，首先是duo sdk的准备，一个简单软件的准备（最小kernel），你自己kernel的准备，中间可以穿插milkv-duo的启动过程的描述
+
+这个先搁置一下
 
 [^1]: rustup是The Rust tool chain installer
 
