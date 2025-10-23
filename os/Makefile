@@ -12,7 +12,7 @@ QEMU_NAME     := qemu-system-riscv64
 # SBI/Bootloader（示例：RustSBI on QEMU virt）
 SBI           ?= rustsbi
 BOARD         ?= qemu
-BOOTLOADER    := ./bootloader/$(SBI)-$(BOARD).bin
+BOOTLOADER    := ../bootloader/$(SBI)-$(BOARD).bin
 
 # Binutils
 OBJDUMP       := rust-objdump --arch-name=riscv64
