@@ -19,4 +19,5 @@ jobs:
     - name: Install
       run: rustup target add riscv64gc-unknown-none-elf
     - name: Build
-      run: cargo build --verbose
+      run: 
+        cargo build --verbose

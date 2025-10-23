@@ -1,15 +1,5 @@
 [build]
 target = "riscv64gc-unknown-none-elf"
 
-[target.riscv64gc-unknown-none-elf]
-rustflags = [
-    "-Clink-arg=-Tsrc/linker.ld", "-Cforce-frame-pointers=yes", "-Clink-arg=-Map=/tmp/pianoOSMap.map"
-]
-
-[target.loongarch64-unknown-none]
-rustflags = [
-    "-Clink-arg=-Tsrc/linker.ld", "-Cforce-frame-pointers=yes", "-Clink-arg=-Map=/tmp/pianoOSMap.map"
-]
-
 [term]
 verbose = true
