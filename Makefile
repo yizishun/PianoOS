@@ -9,7 +9,6 @@ KERNEL_ENTRY_PA ?= 0x80200000
 ifeq ($(ARCH), riscv)
 TARGET        := riscv64gc-unknown-none-elf
 QEMU_NAME     := qemu-system-riscv64
-# SBI/Bootloader（示例：RustSBI on QEMU virt）
 SBI           ?= rustsbi
 BOARD         ?= qemu
 BOOTLOADER    := ./bootloader/$(SBI)-$(BOARD).bin
@@ -29,8 +28,6 @@ QEMU_ARGS     = -smp 8 \
 else ifeq ($(ARCH), loongarch)
 TARGET        := loongarch64-unknown-none
 QEMU_NAME     := qemu-system-loongarch64
-# LoongArch 裸机一般没有 SBI，这里用 device loader 直接装入二进制
-# 如需固件/BootROM，可自行设置 -bios <path>，此处用 -bios none
 BOOTLOADER    :=
 OBJDUMP       := rust-objdump --arch-name=loongarch64
 OBJCOPY       := rust-objcopy --binary-architecture=loongarch64
