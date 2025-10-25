@@ -122,5 +122,3 @@ impl Platform {
     }
     
 }
-
-pub static PLATFORM: Once<Platform> = Once::new();

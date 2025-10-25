@@ -5,10 +5,12 @@ use core::arch::global_asm;
 use log::{info};
 use spin::Once;
 
-use crate::{arch::hart::HartInfo, mm::heap::heap_init, platform::{Platform, PLATFORM}};
-use arch::hart::HART_INFO;
+use crate::{arch::hart::HartInfo, batch::AppManager, mm::heap::heap_init, platform::Platform};
+use crate::global::*;
+use crate::config::NUM_HART_MAX;
 
 mod config;
+mod global;
 mod driver;
 mod console;
 mod error;
@@ -18,25 +20,9 @@ mod devicetree;
 mod platform;
 mod mm;
 mod macros;
+mod batch;
 
 extern crate alloc;
-
-unsafe extern "C" {
-    static skernel: usize;
-    static stext: usize;
-    static etext: usize;
-    static srodata: usize;
-    static erodata: usize;
-    static sdata: usize;
-    static edata: usize;
-    static sstack: usize;
-    static estack: usize;
-    static sheap: usize;
-    static eheap: usize;
-    static sbss: usize;
-    static ebss: usize;
-    static ekernel: usize;
-}
 
 static BOOT_HARTID: Once<usize> = spin::Once::new();
 
@@ -47,12 +33,14 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     // 2. clear bss, heap init and hart info init
     clear_bss();
     heap_init();
-    unsafe {
-        #[allow(static_mut_refs)]
-        for (i, h) in (&mut HART_INFO).iter_mut().enumerate() {
+    HART_INFO.call_once(|| {
+        let mut hart_info = [HartInfo::ZERO_HART; NUM_HART_MAX];
+        for (i, h) in (&mut hart_info).iter_mut().enumerate() {
             *h = HartInfo::new(i);
         }
-    }
+        hart_info
+    });
+    APP_MANAGER.call_once(|| AppManager::new());
     // 3. parse device tree and init platform
     PLATFORM.call_once(|| {
         Platform::init_platform(device_tree)

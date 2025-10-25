@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 use spin::Mutex;
 use alloc::string::String;
 
-use crate::platform::PLATFORM;
+use crate::global::PLATFORM;
 
 #[derive(Clone, Copy, Debug)]
 pub enum ConsoleType {

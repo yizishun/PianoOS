@@ -3,9 +3,8 @@ pub use crate::arch::riscv::hart::*;
 #[cfg(target_arch = "loongarch64")]
 pub use crate::arch::loongarch64::hart::*;
 
-use crate::config::NUM_HART_MAX;
+use crate::global::HART_INFO;
 
-pub static mut HART_INFO: [HartInfo; NUM_HART_MAX] = [HartInfo::ZERO_HART; NUM_HART_MAX];
 pub const HART_INFO_SIZE: usize = size_of::<HartInfo>();
 
 #[derive(Clone, Copy)]
@@ -31,7 +30,7 @@ impl HartInfo {
         { super::riscv::hart::get_cur_hart() }
     }
     pub fn get_hart_by_id(hartid: usize) -> &'static Self {
-        unsafe { &HART_INFO[hartid] }
+        &(HART_INFO.get().unwrap())[hartid]
     }
 
     pub fn get_hartid(&self) -> usize {

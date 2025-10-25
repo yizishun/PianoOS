@@ -23,7 +23,10 @@ fn main() {
     std::fs::write(app_data, insert_app_data()).unwrap();
     let mut build = cc::Build::new();
     build.compiler("riscv64-none-elf-gcc");
-    build.file(app_data).compile("app_data");
+    build
+        .file(app_data)
+        .flag("-mabi=lp64d")
+        .compile("app_data");
 
     println!("cargo:rustc-link-arg=-T{}", ld.display());
     println!("cargo:rustc-link-arg={}", "-Map=/tmp/pianoOSMap.map");
