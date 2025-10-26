@@ -58,12 +58,13 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
         let start_addr = arch::entry::hart_start as usize;
         sbi_rt::hart_start(i, start_addr, 0);
     }
-    // 6. print some kernel information
+    // 6. print some kernel info and app info
     print_kernel_mem();
     info!("kernel current hart state: {}", cur_hart.get_cur_hart_state());
     (0..HartInfo::get_hartnum()).for_each(|id|{
         info!("hart{}: {}", id, arch::hart::get_hart_state(id))
     });
+    APP_MANAGER.get().unwrap().print_app_info();
     // 7. boot hart shutdown
     arch::shutdown(false);
 }

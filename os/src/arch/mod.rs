@@ -2,6 +2,8 @@ pub mod riscv;
 pub mod loongarch64;
 pub mod hart;
 
+use core::arch::asm;
+
 #[cfg(target_arch = "riscv64")]
 pub use riscv::entry;
 
@@ -20,5 +22,14 @@ pub fn sleep(sec: i32) {
   riscv::sleep(sec);
   #[cfg(target_arch = "loongarch64")]
   loongarch64::sleep(sec);
+}
+
+pub unsafe fn fencei() {
+  unsafe {
+    #[cfg(target_arch = "riscv64")]
+    asm!("fence.i");
+    #[cfg(target_arch = "loongarch64")]
+    asm!("ibar");
+  }
 }
 
