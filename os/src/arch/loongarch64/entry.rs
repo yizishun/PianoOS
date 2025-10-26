@@ -1,6 +1,6 @@
 #![cfg(target_arch = "loongarch64")]
 use core::arch::naked_asm;
-use crate::{config::KERNEL_STACK_SIZE_PER_HART, mm::stack::STACK};
+use crate::{config::KERNEL_STACK_SIZE_PER_HART, global::KERNEL_STACK};
 use crate::arch::hart::{HART_INFO, HART_INFO_SIZE};
 
 #[unsafe(naked)]
@@ -39,7 +39,7 @@ unsafe extern "C" fn start() -> ! {
 
             bl      rust_main
         ",
-        stack = sym STACK,
+        stack = sym KERNEL_STACK,
         per_hart_stack_size = const KERNEL_STACK_SIZE_PER_HART,
         hart_info = sym HART_INFO,
         hart_info_size = const HART_INFO_SIZE
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn hart_start() -> ! {
         csrwr   $t2, 0x30
         bl      hart_main
         ",
-        stack = sym STACK,
+        stack = sym KERNEL_STACK,
         per_hart_stack_size = const KERNEL_STACK_SIZE_PER_HART,
         hart_info = sym HART_INFO,
         hart_info_size = const HART_INFO_SIZE

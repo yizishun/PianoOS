@@ -5,7 +5,7 @@ use core::arch::global_asm;
 use log::{info};
 use spin::Once;
 
-use crate::{arch::hart::HartInfo, batch::AppManager, mm::heap::heap_init, platform::Platform};
+use crate::{arch::common::hart::HartInfo, batch::AppManager, mm::heap::heap_init, platform::Platform};
 use crate::global::*;
 use crate::config::NUM_HART_MAX;
 
@@ -55,18 +55,18 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
     // 5. boot hart start other harts
     let cur_hart = HartInfo::get_cur_hart();
     for i in 0..HartInfo::get_hartnum() {
-        let start_addr = arch::entry::hart_start as usize;
+        let start_addr = arch::common::entry::hart_start as usize;
         sbi_rt::hart_start(i, start_addr, 0);
     }
     // 6. print some kernel info and app info
     print_kernel_mem();
     info!("kernel current hart state: {}", cur_hart.get_cur_hart_state());
     (0..HartInfo::get_hartnum()).for_each(|id|{
-        info!("hart{}: {}", id, arch::hart::get_hart_state(id))
+        info!("hart{}: {}", id, arch::common::hart::get_hart_state(id))
     });
     APP_MANAGER.get().unwrap().print_app_info();
     // 7. boot hart shutdown
-    arch::shutdown(false);
+    arch::common::shutdown(false);
 }
 
 #[unsafe(no_mangle)]

@@ -1,15 +1,13 @@
-use core::slice::SliceIndex;
-
 use log::info;
-use spin::{Mutex, Once};
+use spin::Mutex;
 
-use crate::arch::{self, shutdown};
+use crate::arch::common::shutdown;
+use crate::arch;
 use crate::config::MAX_APP_NUM;
 use crate::global::_num_app;
-use crate::print_kernel_mem;
 pub struct AppManager {
     num_app: usize,
-    current_app: Mutex<usize>,
+    current_app: Mutex<usize>, //TODO: UnsafeCell?
     app_start_addr: [usize; MAX_APP_NUM + 1]
 }
 
@@ -62,7 +60,7 @@ impl AppManager {
         info!("Kernel loading app({app_id})");
         unsafe {
             core::ptr::copy_nonoverlapping(app_addr_start as *const u8, dst, count);
-            arch::fencei();
+            arch::common::fencei();
         }
     }
 }

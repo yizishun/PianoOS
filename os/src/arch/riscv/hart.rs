@@ -1,8 +1,7 @@
 use core::arch::asm;
 
 use log::error;
-use sbi_rt::SbiRet;
-use crate::{arch::hart::{HartInfo, HartState}};
+use crate::{arch::common::hart::{HartInfo, HartState}};
 
 pub fn get_cur_hart() -> &'static HartInfo {
     let hart_info_addr: usize;

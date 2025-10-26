@@ -1,8 +1,9 @@
 use spin::Once;
 use crate::platform::Platform;
 use crate::config::NUM_HART_MAX;
-use crate::arch::hart::HartInfo;
+use crate::arch::common::hart::HartInfo;
 use crate::batch::AppManager;
+use crate::mm::stack::Stack;
 
 unsafe extern "C" {
     pub static skernel: usize;
@@ -29,3 +30,6 @@ pub static PLATFORM: Once<Platform> = Once::new();
 pub static HART_INFO: Once<[HartInfo; NUM_HART_MAX]> = Once::new();
 
 pub static APP_MANAGER: Once<AppManager> = Once::new();
+
+#[unsafe(link_section = ".bss.stack")]
+pub static mut KERNEL_STACK: [Stack; NUM_HART_MAX] = [Stack::ZERO; NUM_HART_MAX];

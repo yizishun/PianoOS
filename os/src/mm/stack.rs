@@ -1,11 +1,12 @@
-use crate::config::{KERNEL_STACK_SIZE_PER_HART, NUM_HART_MAX};
-
-#[unsafe(link_section = ".bss.stack")]
-pub static mut STACK: [Stack; NUM_HART_MAX] = [Stack::ZERO; NUM_HART_MAX];
+use crate::config::STACK_SIZE;
 
 #[repr(C, align(128))]
-pub struct Stack([u8; KERNEL_STACK_SIZE_PER_HART]);
+pub struct Stack([u8; STACK_SIZE]);
 
 impl Stack {
-    const ZERO: Self = Self([0; KERNEL_STACK_SIZE_PER_HART]);
+    pub const ZERO: Self = Self([0; STACK_SIZE]);
+
+    pub fn get_stack_base(&self) -> usize {
+        self.0.as_ptr_range().end as usize
+    }
 }

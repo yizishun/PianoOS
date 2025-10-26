@@ -1,6 +1,6 @@
 use log::{LevelFilter, Log, SetLoggerError, set_logger, set_max_level};
 use log::Level;
-use crate::arch::hart::HartInfo;
+use crate::arch::common::hart::HartInfo;
 use crate::arch::riscv;
 use crate::println;
 
