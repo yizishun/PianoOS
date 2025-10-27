@@ -1,4 +1,6 @@
 pub mod hart;
+pub mod trap;
+
 use core::arch::asm;
 use crate::arch::riscv;
 use crate::arch::loongarch64;

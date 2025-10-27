@@ -1,5 +1,6 @@
 pub mod entry;
 pub mod hart;
+pub mod trap;
 
 pub fn shutdown(fail: bool) -> ! {
     loop {}

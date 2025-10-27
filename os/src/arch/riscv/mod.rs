@@ -1,5 +1,6 @@
 pub mod hart;
 pub mod entry;
+pub mod trap;
 
 use crate::config::FREQUNCY;
 use log::info;

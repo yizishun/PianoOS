@@ -8,6 +8,7 @@ use crate::global::HART_INFO;
 pub const HART_INFO_SIZE: usize = size_of::<HartInfo>();
 
 #[derive(Clone, Copy)]
+#[repr(C)]
 pub struct HartInfo {
     hartid: usize
 }
