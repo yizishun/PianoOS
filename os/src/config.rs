@@ -1,5 +1,5 @@
 
-pub const FREQUNCY: i32 = 10;
+pub const VIRT_FREQUNCY: i32 = 10;
 pub const KERNEL_HEAP_SIZE: usize = 32 * 1024;
 pub const STACK_SIZE: usize = 16 *1024;
 pub const NUM_HART_MAX: usize = 8;

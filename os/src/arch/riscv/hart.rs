@@ -1,14 +1,14 @@
 use core::arch::asm;
 
 use log::error;
-use crate::{arch::common::hart::{HartInfo, HartState}};
+use crate::{arch::common::hart::{HartContext, HartState}};
 
-pub fn get_cur_hart() -> &'static HartInfo {
+pub fn get_cur_hart() -> &'static HartContext {
     let hart_info_addr: usize;
     unsafe { 
         asm!("csrr {}, sscratch", out(reg) hart_info_addr);
     }
-    let hart_info = hart_info_addr as *const HartInfo;
+    let hart_info = hart_info_addr as *const HartContext;
     unsafe {
         &(*hart_info)
     }

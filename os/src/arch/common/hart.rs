@@ -3,35 +3,18 @@ pub use crate::arch::riscv::hart::*;
 #[cfg(target_arch = "loongarch64")]
 pub use crate::arch::loongarch64::hart::*;
 
-use crate::global::HART_INFO;
+pub const HART_INFO_SIZE: usize = size_of::<HartContext>();
 
-pub const HART_INFO_SIZE: usize = size_of::<HartInfo>();
-
-#[derive(Clone, Copy)]
 #[repr(C)]
-pub struct HartInfo {
+pub struct HartContext {
+    trap_context: super::FlowContext,
+
     hartid: usize
 }
 
-impl HartInfo {
-    pub const ZERO_HART: HartInfo = HartInfo { hartid: 0 };
-
-    pub fn new(i: usize) -> Self {
-        HartInfo { hartid: i }
-    }
-
+impl HartContext {
     pub fn get_hartnum() -> usize {
         crate::PLATFORM.get().unwrap().board_info.cpu_num.unwrap()
-    }
-
-    pub fn get_cur_hart() -> &'static Self {
-        #[cfg(target_arch = "riscv64")]
-        { super::riscv::hart::get_cur_hart() }
-        #[cfg(target_arch = "loongarch64")]
-        { super::riscv::hart::get_cur_hart() }
-    }
-    pub fn get_hart_by_id(hartid: usize) -> &'static Self {
-        &(HART_INFO.get().unwrap())[hartid]
     }
 
     pub fn get_hartid(&self) -> usize {

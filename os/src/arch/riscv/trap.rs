@@ -31,7 +31,7 @@ macro_rules! load {
 }
 
 #[repr(C)]
-pub struct TrapContext {
+pub struct FlowContext {
     pub ra: usize,      // 0..
     pub t: [usize; 7],  // 1..
     pub a: [usize; 8],  // 8..

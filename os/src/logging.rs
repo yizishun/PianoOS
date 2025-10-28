@@ -1,6 +1,6 @@
 use log::{LevelFilter, Log, SetLoggerError, set_logger, set_max_level};
 use log::Level;
-use crate::arch::common::hart::HartInfo;
+use crate::arch::common::hart::HartContext;
 use crate::arch::riscv;
 use crate::println;
 
@@ -23,8 +23,9 @@ impl Log for PianoLogger {
             Level::Debug => "\x1b[1;32m",
             Level::Trace => "\x1b[1;90m"
         };
-        let hart = HartInfo::get_cur_hart();
-        let hart_id = hart.get_hartid();
+        //let hart = HartContext::get_cur_hart();
+        //let hart_id = hart.get_hartid();
+        let hart_id = 0;
         let ansi_reset = "\x1b[0m";
         let bold = "\x1b[1;37m";
         println!(

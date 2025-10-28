@@ -1,4 +1,4 @@
 #[repr(C)]
-pub struct TrapContext {
+pub struct FlowContext {
     pub reg: [usize; 32],
 }
