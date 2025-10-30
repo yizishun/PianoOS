@@ -20,12 +20,12 @@ unsafe extern "C" fn start() -> ! {
 		j real_start
 		.balign 4
 		",
-                "real_start:
+        "real_start:
 		la sp, {stack}
 		li t0, {per_hart_stack_size}
 		addi t1, a0, 1                 //get boot hart id
 		//locat stack base
-		1: add sp, sp, t0
+	1:  	add sp, sp, t0
 		addi t1, t1, -1
 		bnez t1, 1b
 		//locat stack area
@@ -48,7 +48,7 @@ pub unsafe extern "C" fn hart_start() -> ! {
 		li t0, {per_hart_stack_size}
 		addi t1, a0, 0                 //get boot hart id
 		addi t1, t1, 1
-		1: add sp, sp, t0
+	1: 	add sp, sp, t0
 		addi t1, t1, -1
 		bnez t1, 1b
 

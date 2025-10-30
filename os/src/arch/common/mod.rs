@@ -21,6 +21,13 @@ pub trait ArchTime {
         fn sleep(&self, sec: i32);
 }
 
+pub trait ArchHarts {
+	fn exchange_scratch(&self, val: usize) -> usize;
+	fn get_scratch(&self) -> usize;
+}
+
 #[cfg(target_arch = "riscv64")]
 pub type Arch = Riscv64<RiscvVirt>; //TODO: 这个RiscvVirt只是默认
 
+#[cfg(target_arch = "riscv64")]
+pub use crate::arch::riscv::trap::FlowContext as FlowContext;

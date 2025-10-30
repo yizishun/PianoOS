@@ -3,6 +3,7 @@ pub mod mem;
 pub mod power;
 pub mod time;
 pub mod trap;
+pub mod harts;
 
 use core::marker::PhantomData;
 

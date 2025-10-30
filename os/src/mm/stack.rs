@@ -5,7 +5,7 @@ pub struct Stack([u8; STACK_SIZE]);
 
 //                      Stack
 //     low_addr   +----HartContext---+
-//                |  flowContext     |
+//                |  flow_context    |
 //                |  hart_id         |
 //                +----Stack Space---+
 //                |                  |

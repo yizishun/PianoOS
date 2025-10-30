@@ -24,6 +24,7 @@ mod logging;
 mod macros;
 mod mm;
 mod platform;
+mod trap;
 
 extern crate alloc;
 
