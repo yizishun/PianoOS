@@ -1,13 +1,11 @@
-use core::marker::PhantomData;
-
-use crate::arch::common::ArchTime;
-
-pub mod hart;
 pub mod entry;
-pub mod trap;
+pub mod hart;
+pub mod mem;
 pub mod power;
-pub mod isa;
 pub mod time;
+pub mod trap;
+
+use core::marker::PhantomData;
 
 pub struct RiscvVirt;
 

@@ -19,9 +19,9 @@ pub struct Stack([u8; STACK_SIZE]);
 //                | drop(ptr)        |
 //     hign addr  +------------------+
 impl Stack {
-    pub const ZERO: Self = Self([0; STACK_SIZE]);
+        pub const ZERO: Self = Self([0; STACK_SIZE]);
 
-    pub fn get_stack_base(&self) -> usize {
-        self.0.as_ptr_range().end as usize
-    }
+        pub fn get_stack_base(&self) -> usize {
+                self.0.as_ptr_range().end as usize
+        }
 }
