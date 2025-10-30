@@ -5,6 +5,7 @@ use core::arch::global_asm;
 use log::info;
 use spin::Once;
 
+use crate::arch::common::ArchPower;
 use crate::config::NUM_HART_MAX;
 use crate::global::*;
 use crate::{
@@ -51,14 +52,10 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
         }
         // 6. print some kernel info and app info
         print_kernel_mem();
-        (0..HartContext::get_hartnum()).for_each(|id| {
-                                               info!("hart{}: {}",
-                                                     id,
-                                                     arch::common::hart::get_hart_state(id))
-                                       });
         APP_MANAGER.get().unwrap().print_app_info();
         // 7. boot hart shutdown
-        arch::common::shutdown(false);
+        info!("Kernel shutdown");
+        ARCH.shutdown(false);
 }
 
 #[unsafe(no_mangle)]

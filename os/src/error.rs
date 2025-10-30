@@ -1,6 +1,8 @@
 use core::panic::PanicInfo;
 
-use crate::{arch::riscv, devicetree::ParseDeviceTreeError};
+use crate::arch::common::{ArchMem, ArchPower};
+use crate::devicetree::ParseDeviceTreeError;
+use crate::global::ARCH;
 use log::error;
 
 #[panic_handler]
@@ -14,7 +16,7 @@ fn panic(_info: &PanicInfo) -> ! {
         } else {
                 error!("Panic due to {}", _info.message());
         }
-        riscv::shutdown(true);
+	ARCH.shutdown(true);
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

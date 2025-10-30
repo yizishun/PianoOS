@@ -1,8 +1,9 @@
 use log::info;
 use spin::Mutex;
 
-use crate::arch;
-use crate::arch::common::shutdown;
+use crate::arch::common::ArchMem;
+use crate::global::ARCH;
+use crate::arch::common::ArchPower;
 use crate::config::MAX_APP_NUM;
 use crate::global::_num_app;
 pub struct AppManager {
@@ -46,7 +47,7 @@ impl AppManager {
                 use crate::config::APP_BASE_ADDR;
                 if app_id > self.num_app {
                         info!("All applications completed! Kennel shutdown");
-                        shutdown(false);
+			ARCH.shutdown(false);
                 }
                 let app_addr_start = *self.app_start_addr.get(app_id).unwrap();
                 let app_addr_end = *self.app_start_addr.get(app_id + 1).unwrap();
@@ -55,7 +56,9 @@ impl AppManager {
                 info!("Kernel loading app({app_id})");
                 unsafe {
                         core::ptr::copy_nonoverlapping(app_addr_start as *const u8, dst, count);
-                        arch::common::fencei();
+                        unsafe {
+			    ARCH.fencei();
+			}
                 }
         }
 }

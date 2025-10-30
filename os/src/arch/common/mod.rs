@@ -10,7 +10,7 @@ pub use crate::arch::riscv::entry;
 
 // some common behavior
 pub trait ArchMem {
-        unsafe fn fencei();
+        unsafe fn fencei(&self);
 }
 
 pub trait ArchPower {
@@ -22,4 +22,5 @@ pub trait ArchTime {
 }
 
 #[cfg(target_arch = "riscv64")]
-type Arch = Riscv64<RiscvVirt>; //TODO: 这个RiscvVirt只是默认
+pub type Arch = Riscv64<RiscvVirt>; //TODO: 这个RiscvVirt只是默认
+

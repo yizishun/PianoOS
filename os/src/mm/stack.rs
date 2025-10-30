@@ -1,4 +1,4 @@
-use crate::config::STACK_SIZE;
+use crate::{arch::common::hart::HartContext, config::STACK_SIZE};
 
 #[repr(C, align(128))]
 pub struct Stack([u8; STACK_SIZE]);
@@ -19,9 +19,15 @@ pub struct Stack([u8; STACK_SIZE]);
 //                | drop(ptr)        |
 //     hign addr  +------------------+
 impl Stack {
-        pub const ZERO: Self = Self([0; STACK_SIZE]);
+    	pub const ZERO: Self = Self([0; STACK_SIZE]);
 
-        pub fn get_stack_base(&self) -> usize {
-                self.0.as_ptr_range().end as usize
-        }
+    	/// get mut hartContext in stack
+    	pub fn hart_context_mut(&mut self) -> &mut HartContext {
+        	unsafe { &mut *self.0.as_mut_ptr().cast() }
+    	}
+
+    	/// get hartContext in stack
+    	pub fn hart_context(&mut self) -> & HartContext {
+        	unsafe { & *self.0.as_mut_ptr().cast() }
+    	}
 }

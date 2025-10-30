@@ -29,7 +29,7 @@ unsafe extern "C" fn start() -> ! {
 		addi t1, t1, -1
 		bnez t1, 1b
 		//locat stack area
-		call t1, {}
+		//call t1
 		
 		call rust_main
 		",

@@ -1,8 +1,3 @@
-#[cfg(target_arch = "loongarch64")]
-pub use crate::arch::loongarch64::hart::*;
-#[cfg(target_arch = "riscv64")]
-pub use crate::arch::riscv::hart::*;
-
 pub const HART_INFO_SIZE: usize = size_of::<HartContext>();
 
 #[repr(C)]

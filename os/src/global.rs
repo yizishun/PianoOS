@@ -3,6 +3,7 @@ use crate::batch::AppManager;
 use crate::config::NUM_HART_MAX;
 use crate::mm::stack::Stack;
 use crate::platform::Platform;
+use crate::arch::common::Arch;
 use spin::Once;
 
 unsafe extern "C" {
@@ -30,3 +31,5 @@ pub static APP_MANAGER: Once<AppManager> = Once::new();
 
 #[unsafe(link_section = ".bss.stack")]
 pub static mut KERNEL_STACK: [Stack; NUM_HART_MAX] = [Stack::ZERO; NUM_HART_MAX];
+
+pub static ARCH: Arch = Arch::new();
