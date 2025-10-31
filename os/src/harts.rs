@@ -1,16 +1,17 @@
+
 pub const HART_INFO_SIZE: usize = size_of::<HartContext>();
 
-#[repr(C)]
+#[repr(C, align(128))]
 pub struct HartContext {
-        #[cfg(target_arch = "riscv64")]
-        flow_context: crate::arch::riscv::trap::FlowContext,
-        #[cfg(target_arch = "loongarch64")]
-        flow_context: crate::arch::loongarch64::trap::FlowContext,
-
+        flow_context: crate::arch::common::FlowContext,
         hartid: usize,
 }
 
 impl HartContext {
+        pub fn init(&mut self, hartid: usize){
+                self.hartid = hartid;
+        }
+
         pub fn get_hartnum() -> usize {
                 crate::PLATFORM.get().unwrap().board_info.cpu_num.unwrap()
         }

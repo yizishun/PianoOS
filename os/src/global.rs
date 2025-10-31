@@ -1,4 +1,3 @@
-use crate::arch::common::hart::HartContext;
 use crate::batch::AppManager;
 use crate::config::NUM_HART_MAX;
 use crate::mm::stack::Stack;

@@ -107,7 +107,7 @@ impl Drop for LoadedTrapStack {
 
 /// 陷入处理器上下文。
 #[repr(C)]
-struct TrapHandler {
+pub struct TrapHandler {
     /// 指向一个陷入上下文的指针。
     ///
     /// # TODO

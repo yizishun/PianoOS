@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![feature(ptr_mask)]
 
 use core::arch::global_asm;
 use log::info;
@@ -9,7 +10,7 @@ use crate::arch::common::ArchPower;
 use crate::config::NUM_HART_MAX;
 use crate::global::*;
 use crate::{
-        arch::common::hart::HartContext, batch::AppManager, mm::heap::heap_init, platform::Platform,
+        harts::HartContext, batch::AppManager, mm::heap::heap_init, platform::Platform,
 };
 
 mod arch;
@@ -25,6 +26,7 @@ mod macros;
 mod mm;
 mod platform;
 mod trap;
+mod harts;
 
 extern crate alloc;
 

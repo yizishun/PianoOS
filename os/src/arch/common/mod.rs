@@ -1,5 +1,3 @@
-pub mod hart;
-
 use crate::arch::riscv::*;
 
 // entry

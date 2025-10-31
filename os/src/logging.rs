@@ -1,5 +1,3 @@
-use crate::arch::common::hart::HartContext;
-use crate::arch::riscv;
 use crate::println;
 use log::Level;
 use log::{LevelFilter, Log, SetLoggerError, set_logger, set_max_level};
