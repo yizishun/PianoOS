@@ -120,12 +120,15 @@ SECTIONS
     edata = .;
 
     .bss : {
+        . = ALIGN(4K);
         sstack = .;
         *(.bss.stack)
         estack = .;
+        . = ALIGN(4K);
         sheap = .;
         *(.bss.heap)
         eheap = .;
+        . = ALIGN(4K);
         sbss = .;
         *(.bss .bss.*)
         *(.sbss .sbss.*)

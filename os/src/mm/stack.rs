@@ -1,7 +1,16 @@
+use core::intrinsics::forget;
+
 use crate::arch::common::ArchHarts;
 use crate::global::ARCH;
 use crate::{harts::HartContext, config::STACK_SIZE};
-use crate::trap::TrapHandler;
+use crate::trap::{FreeTrapStack, TrapHandler};
+use crate::trap::fast::fast_handler;
+
+// Make sure stack address can be aligned.
+const _: () = assert!(STACK_SIZE % align_of::<Stack>() == 0);
+
+// Make sure alignment of TrapHandler is smaller than Stack
+const _: () = assert!(align_of::<Stack>() >= align_of::<TrapHandler>());
 
 #[repr(C, align(128))]
 pub struct Stack([u8; STACK_SIZE]);
@@ -32,7 +41,8 @@ impl Stack {
 
 	/// get trap handler size
 	fn trap_handler_size() -> usize {
-		size_of::<TrapHandler>()
+		STACK_SIZE -
+			(STACK_SIZE - size_of::<TrapHandler>()) & !(align_of::<TrapHandler>() - 1)
 	}
 
 	fn stack_space_size() -> usize {
@@ -82,8 +92,19 @@ impl Stack {
 	/// Initializes stack for trap handling.
     	/// - Sets up hart context.
     	/// - Creates and loads FreeTrapStack with the stack range.
-    	fn load_as_stack(&'static mut self, hartid: usize) {
+    	pub fn load_as_stack(&'static mut self, hartid: usize) {
 		let hart_context = self.hart_context_mut();
+		let context_ptr = hart_context.context_ptr();
 		hart_context.init(hartid);
+
+		let range = self.0.as_ptr_range();
+		forget(
+			FreeTrapStack::new(
+				range.start as usize.. range.end as usize, 
+				|_| {}, 
+				context_ptr,
+				fast_handler
+			).unwrap().load()
+		);
 	}
 }

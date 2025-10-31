@@ -1,5 +1,5 @@
-mod entire;
-mod fast;
+pub mod entire;
+pub mod fast;
 
 use fast::*;
 use crate::arch::common::{

@@ -24,6 +24,10 @@ pub trait ArchHarts {
 	fn get_scratch(&self) -> usize;
 }
 
+pub trait ArchTrap {
+        unsafe fn load_direct_trap_entry(&self);
+}
+
 #[cfg(target_arch = "riscv64")]
 pub type Arch = Riscv64<RiscvVirt>; //TODO: 这个RiscvVirt只是默认
 

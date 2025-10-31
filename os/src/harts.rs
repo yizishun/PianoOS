@@ -1,6 +1,15 @@
 
 pub const HART_INFO_SIZE: usize = size_of::<HartContext>();
 
+use core::ptr::NonNull;
+
+// Make sure HartContext is aligned.
+//
+// HartContext will always at the end of Stack, so we should make sure
+// STACK_SIZE_PER_HART is a multiple of b.
+use crate::{arch::common::FlowContext, config::STACK_SIZE};
+const _: () = assert!(STACK_SIZE % core::mem::align_of::<HartContext>() == 0);
+
 #[repr(C, align(128))]
 pub struct HartContext {
         flow_context: crate::arch::common::FlowContext,
@@ -18,6 +27,12 @@ impl HartContext {
 
         pub fn get_hartid(&self) -> usize {
                 self.hartid
+        }
+
+        pub fn context_ptr(&mut self) -> NonNull<FlowContext>{
+                unsafe {
+                        NonNull::new_unchecked(&mut self.flow_context)
+                }
         }
 }
 

@@ -96,3 +96,17 @@ pub enum FastResult {
     /// 调用完整路径函数。
     Continue = 4,
 }
+
+pub extern "C" fn fast_handler(
+    ctx: FastContext,
+    a1: usize,
+    a2: usize,
+    a3: usize,
+    a4: usize,
+    a5: usize,
+    a6: usize,
+    a7: usize,
+) -> FastResult {
+    FastResult::Restore
+}
+
