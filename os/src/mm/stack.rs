@@ -35,17 +35,17 @@ impl Stack {
     	pub const ZERO: Self = Self([0; STACK_SIZE]);
 
 	/// get hart context size
-	const fn hart_context_size() -> usize {
+	pub const fn hart_context_size() -> usize {
 		size_of::<HartContext>()
 	}
 
 	/// get trap handler size
-	fn trap_handler_size() -> usize {
+	pub const fn trap_handler_size() -> usize {
 		STACK_SIZE -
 			(STACK_SIZE - size_of::<TrapHandler>()) & !(align_of::<TrapHandler>() - 1)
 	}
 
-	fn stack_space_size() -> usize {
+	pub const fn stack_space_size() -> usize {
 		size_of::<Self>() - Self::trap_handler_size() - Self::hart_context_size()
 	}
 

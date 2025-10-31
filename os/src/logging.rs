@@ -1,3 +1,4 @@
+use crate::harts::current_hartid_in_boot_stage;
 use crate::println;
 use log::Level;
 use log::{LevelFilter, Log, SetLoggerError, set_logger, set_max_level};
@@ -21,11 +22,9 @@ impl Log for PianoLogger {
                         Level::Debug => "\x1b[1;32m",
                         Level::Trace => "\x1b[1;90m",
                 };
-                //let hart = HartContext::get_cur_hart();
-                //let hart_id = hart.get_hartid();
-                let hart_id = 0;
                 let ansi_reset = "\x1b[0m";
                 let bold = "\x1b[1;37m";
+                let hart_id = current_hartid_in_boot_stage();
                 println!("{bold}[kernel]{reset}{color_log} {:<5}[{:>2}]{reset} - {}",
                          record.level(),
                          hart_id,
@@ -33,6 +32,12 @@ impl Log for PianoLogger {
                          reset = ansi_reset,
                          color_log = ansi_color,
                          bold = bold);
+//                println!("{bold}[kernel]{reset}{color_log} {:<5}{reset} - {}",
+//                         record.level(),
+//                         record.args(),
+//                         reset = ansi_reset,
+//                         color_log = ansi_color,
+//                         bold = bold);
         }
 }
 

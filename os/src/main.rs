@@ -8,6 +8,7 @@ use log::info;
 use spin::Once;
 
 use crate::arch::common::ArchPower;
+use crate::arch::common::ArchTime;
 use crate::arch::common::ArchTrap;
 use crate::config::NUM_HART_MAX;
 use crate::global::*;
@@ -42,36 +43,40 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
         // 2. parse device tree and init platform
         PLATFORM.call_once(|| Platform::init_platform(device_tree).unwrap());
 
-        // 3. logging system init and print some infomation
+        // 3. prepare for trap
+        unsafe {
+                ARCH.load_direct_trap_entry(); // set stvec
+                KERNEL_STACK[hartid].load_as_stack(hartid); //init HartContext and TrapHandler
+        };
+
+        // 4. logging system init and print some infomation
         logging::init().expect("Logging System init fail");
         info!("Logging system init success");
         info!("boot hartid: {}", hartid);
         info!("device tree addr: {:p}", device_tree as *const u8);
         PLATFORM.get().unwrap().print_platform_info();
 
-        // 4. boot hart start other harts
+        // 5. boot hart start other harts
         for i in 0..HartContext::get_hartnum() {
                 let start_addr = arch::common::entry::hart_start as usize;
                 sbi_rt::hart_start(i, start_addr, 0);
         }
 
-        // 5. print some kernel info and app info
+        // 6. print some kernel info and app info
         print_kernel_mem();
         APP_MANAGER.get().unwrap().print_app_info();
 
-        // 6. prepare for trap
-        unsafe {
-                ARCH.load_direct_trap_entry(); // set stvec
-                KERNEL_STACK[hartid].load_as_stack(hartid); //init HartContext and TrapHandler
-        };
-        
         // 7. boot hart shutdown
-        info!("Kernel shutdown");
+        info!("Kernel shutdown in 2 sec");
+        ARCH.sleep(2);
         ARCH.shutdown(false);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn hart_main(hartid: usize, opaque: usize) -> ! {
+        unsafe {
+                KERNEL_STACK[hartid].load_as_stack(hartid); //init HartContext and TrapHandler
+        }
         info!("hart {} boot success", hartid);
         loop {}
 }
