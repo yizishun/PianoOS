@@ -1,14 +1,7 @@
 ﻿use core::{mem::MaybeUninit, ptr::NonNull};
-use log::warn;
-use riscv::interrupt::supervisor::Exception;
-use riscv::register::{scause, sepc, stval};
-use riscv::register::mcause::Trap;
-
-use crate::syscall::syscallid::SyscallID;
 use crate::trap::TrapHandler;
 use crate::trap::entire::EntireHandler;
 use crate::arch::common::FlowContext;
-use crate::syscall::syscall;
 
 /// 快速路径函数。
 pub type FastHandler = extern "C" fn(
@@ -103,53 +96,3 @@ pub enum FastResult {
 	/// 调用完整路径函数。
 	Continue = 4,
 }
-
-use crate::APP_MANAGER;
-pub extern "C" fn fast_handler(
-    mut ctx: FastContext,
-    a1: usize,
-    a2: usize,
-    a3: usize,
-    a4: usize,
-    a5: usize,
-    a6: usize,
-    a7: usize,
-) -> FastResult {
-    let scause = scause::read();
-    let stval = stval::read();
-    match scause.cause()
-        .try_into::<riscv::interrupt::Interrupt, riscv::interrupt::supervisor::Exception>()
-        .unwrap() {
-
-        Trap::Exception(Exception::UserEnvCall) => {
-		unsafe {
-			sepc::write(sepc::read() + 4);
-			ctx.regs().a[0] = 
-				syscall(a7.try_into().unwrap(), [ctx.a0(), a1, a2]) as usize
-		}
-		FastResult::Restore
-        }
-        Trap::Exception(Exception::StoreFault) |
-        Trap::Exception(Exception::StorePageFault) => {
-		warn!("PageFault in application, kernel killed it.");
-		APP_MANAGER.get().unwrap().run_next_app();
-		unsafe {
-			sepc::write(crate::config::APP_BASE_ADDR);
-		}
-		FastResult::Restore
-        }
-	Trap::Exception(Exception::IllegalInstruction) => {
-		warn!("IllegalInstruction in application, kernel killed it.");
-		APP_MANAGER.get().unwrap().run_next_app();
-		unsafe {
-			sepc::write(crate::config::APP_BASE_ADDR);
-		}
-		FastResult::Restore
-	}
-
-        _ => {
-		panic!("Unsupported trap {:?}, stval = {:#x}!", scause.cause(), stval);
-	}
-    }
-}
-

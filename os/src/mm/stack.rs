@@ -4,7 +4,7 @@ use crate::arch::common::ArchHarts;
 use crate::global::ARCH;
 use crate::{harts::HartContext, config::STACK_SIZE};
 use crate::trap::{FreeTrapStack, TrapHandler};
-use crate::trap::fast::fast_handler;
+use crate::arch::common::fast_handler;
 
 // Make sure stack address can be aligned.
 const _: () = assert!(STACK_SIZE % align_of::<Stack>() == 0);

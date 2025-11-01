@@ -10,6 +10,10 @@ pub use crate::arch::riscv::entry;
 #[cfg(target_arch = "riscv64")]
 pub use crate::arch::riscv::trap::boot_entry;
 
+// fast handler
+#[cfg(target_arch = "riscv64")]
+pub use crate::arch::riscv::trap::fast_handler;
+
 // some common behavior
 pub trait ArchMem {
         unsafe fn fencei(&self);
