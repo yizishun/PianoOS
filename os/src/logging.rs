@@ -18,7 +18,7 @@ impl Log for PianoLogger {
                 let ansi_color = match record.level() {
                         Level::Info => "\x1b[1;34m",
                         Level::Error => "\x1b[1;31m",
-                        Level::Warn => "\x1b[1;93m",
+                        Level::Warn => "\x1b[1;33m",
                         Level::Debug => "\x1b[1;32m",
                         Level::Trace => "\x1b[1;90m",
                 };

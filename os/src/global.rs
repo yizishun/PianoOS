@@ -13,8 +13,10 @@ unsafe extern "C" {
         pub static erodata: usize;
         pub static sdata: usize;
         pub static edata: usize;
-        pub static sstack: usize;
-        pub static estack: usize;
+        pub static skstack: usize;
+        pub static ekstack: usize;
+        pub static sustack: usize;
+        pub static eustack: usize;
         pub static sheap: usize;
         pub static eheap: usize;
         pub static sbss: usize;
@@ -28,7 +30,10 @@ pub static PLATFORM: Once<Platform> = Once::new();
 
 pub static APP_MANAGER: Once<AppManager> = Once::new();
 
-#[unsafe(link_section = ".bss.stack")]
+#[unsafe(link_section = ".bss.kstack")]
 pub static mut KERNEL_STACK: [Stack; NUM_HART_MAX] = [Stack::ZERO; NUM_HART_MAX];
+
+#[unsafe(link_section = ".bss.ustack")]
+pub static mut USER_STACK: [Stack; NUM_HART_MAX] = [Stack::ZERO; NUM_HART_MAX];
 
 pub static ARCH: Arch = Arch::new();

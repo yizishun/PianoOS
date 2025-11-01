@@ -1,7 +1,8 @@
 use core::panic::PanicInfo;
 
-use crate::arch::common::{ArchMem, ArchPower};
+use crate::arch::common::ArchPower;
 use crate::devicetree::ParseDeviceTreeError;
+use crate::syscall::syscallid::SyscallError;
 use crate::global::ARCH;
 use log::error;
 
@@ -22,6 +23,7 @@ fn panic(_info: &PanicInfo) -> ! {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum KernelError {
         DeviceTree(ParseDeviceTreeError),
+        Syscall(SyscallError)
 }
 
 impl From<ParseDeviceTreeError> for KernelError {

@@ -121,13 +121,20 @@ SECTIONS
 
     .bss : {
         . = ALIGN(4K);
-        sstack = .;
-        *(.bss.stack)
-        estack = .;
+        skstack = .;
+        *(.bss.kstack)
+        ekstack = .;
+
+        . = ALIGN(4K);
+        sustack = .;
+        *(.bss.ustack)
+        eustack = .;
+
         . = ALIGN(4K);
         sheap = .;
         *(.bss.heap)
         eheap = .;
+        
         . = ALIGN(4K);
         sbss = .;
         *(.bss .bss.*)

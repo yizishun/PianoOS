@@ -1,14 +1,15 @@
-use core::arch::naked_asm;
-use core::arch::asm;
+use core::arch::{asm, naked_asm};
 
-use riscv::register::sstatus::Sstatus;
+use riscv::register::{sepc, sstatus::{self, SPP, Sstatus}, stvec::{self, Stvec}};
 
 use crate::arch::{common::ArchTrap, riscv::Riscv64};
 
 impl<C> ArchTrap for Riscv64<C> {
         #[inline]
         unsafe fn load_direct_trap_entry(&self) {
-                unsafe { asm!("csrw stvec, {0}", in(reg) trap_entry, options(nomem)) }
+                unsafe {
+                    stvec::write(Stvec::new(trap_entry as usize, stvec::TrapMode::Direct));
+                }
         }
 }
 
@@ -184,4 +185,45 @@ pub unsafe extern "C" fn trap_entry() {
                 exchange!(),
                 r#return!(),
         )
+}
+
+#[unsafe(naked)]
+pub unsafe extern "C" fn boot_entry() -> ! {
+        naked_asm!(
+                ".align 2",
+                // sscratch is set in load_as_stack in main
+                "call {boot_handler}",
+                "call {locate}",
+                "sret",
+                boot_handler = sym boot_handler,
+                locate = sym locate_user_stack
+
+        )
+}
+
+pub extern "C" fn boot_handler() {
+        unsafe {
+                sstatus::set_spp(SPP::User);
+                sepc::write(crate::config::APP_BASE_ADDR);
+        }
+}
+
+/// Locates and initializes user stack for each hart.
+///
+/// This is a naked function that sets up the stack pointer based on hart ID.
+#[unsafe(naked)]
+pub(crate) unsafe extern "C" fn locate_user_stack() {
+    core::arch::naked_asm!(
+        "   la   sp, {stack}            // Load stack base address
+            li   t0, {per_hart_stack_size} // Load stack size per hart
+            mv t1, a0                   // Get current hart ID
+            addi t1, t1,  1             // Add 1 to hart ID
+         1: add  sp, sp, t0             // Calculate stack pointer
+            addi t1, t1, -1             // Decrement counter
+            bnez t1, 1b                 // Loop if not zero
+            ret                         // Return
+        ",
+        per_hart_stack_size = const crate::config::STACK_SIZE,
+        stack               =   sym crate::USER_STACK,
+    )
 }

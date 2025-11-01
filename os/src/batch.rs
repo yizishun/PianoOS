@@ -1,14 +1,14 @@
 use log::info;
-use spin::Mutex;
+use spin::{Mutex, MutexGuard};
 
 use crate::arch::common::ArchMem;
-use crate::global::ARCH;
+use crate::global::{APP_MANAGER, ARCH};
 use crate::arch::common::ArchPower;
 use crate::config::MAX_APP_NUM;
 use crate::global::_num_app;
 pub struct AppManager {
         num_app: usize,
-        current_app: Mutex<usize>, //TODO: UnsafeCell?
+        next_app: Mutex<usize>,
         app_start_addr: [usize; MAX_APP_NUM + 1],
 }
 
@@ -22,7 +22,7 @@ impl AppManager {
                 let mut app_start_addr: [usize; MAX_APP_NUM + 1] = [0; MAX_APP_NUM + 1];
                 app_start_addr[..count].copy_from_slice(app_start_addr_raw);
                 AppManager { num_app: num_app_usize,
-                             current_app: Mutex::new(0),
+                             next_app: Mutex::new(0),
                              app_start_addr: app_start_addr }
         }
 
@@ -35,17 +35,13 @@ impl AppManager {
                 }
         }
 
-        pub fn get_cur_app(&self) -> usize {
-                *self.current_app.lock()
-        }
-
-        pub fn move_to_next_app(&self) {
-                *self.current_app.lock() += 1;
+        pub fn next_app(&self) -> MutexGuard<usize> {
+                self.next_app.lock()
         }
 
         pub fn load_app(&self, app_id: usize) {
                 use crate::config::APP_BASE_ADDR;
-                if app_id > self.num_app {
+                if app_id >= self.num_app {
                         info!("All applications completed! Kennel shutdown");
 			ARCH.shutdown(false);
                 }
@@ -56,9 +52,13 @@ impl AppManager {
                 info!("Kernel loading app({app_id})");
                 unsafe {
                         core::ptr::copy_nonoverlapping(app_addr_start as *const u8, dst, count);
-                        unsafe {
-			    ARCH.fencei();
-			}
+			ARCH.fencei();
                 }
+        }
+
+        pub fn run_next_app(&self) {
+                let mut next_app = self.next_app();
+                self.load_app(*next_app);
+                *next_app += 1;
         }
 }

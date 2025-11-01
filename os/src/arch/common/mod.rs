@@ -1,10 +1,14 @@
 use crate::arch::riscv::*;
 
-// entry
+// kernel entry
 #[cfg(target_arch = "loongarch64")]
 pub use crate::arch::loongarch64::entry;
 #[cfg(target_arch = "riscv64")]
 pub use crate::arch::riscv::entry;
+
+// app boot enrty
+#[cfg(target_arch = "riscv64")]
+pub use crate::arch::riscv::trap::boot_entry;
 
 // some common behavior
 pub trait ArchMem {

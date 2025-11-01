@@ -3,14 +3,14 @@
 #![feature(ptr_mask)]
 #![feature(core_intrinsics)]
 
-use core::arch::global_asm;
+use core::arch::asm;
+
 use log::info;
-use spin::Once;
 
 use crate::arch::common::ArchPower;
 use crate::arch::common::ArchTime;
 use crate::arch::common::ArchTrap;
-use crate::config::NUM_HART_MAX;
+use crate::arch::common::boot_entry;
 use crate::global::*;
 use crate::{
         harts::HartContext, batch::AppManager, mm::heap::heap_init, platform::Platform,
@@ -30,6 +30,7 @@ mod mm;
 mod platform;
 mod trap;
 mod harts;
+mod syscall;
 
 extern crate alloc;
 
@@ -66,14 +67,18 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
         print_kernel_mem();
         APP_MANAGER.get().unwrap().print_app_info();
 
-        // 7. boot hart shutdown
-        info!("Kernel shutdown in 2 sec");
-        ARCH.sleep(2);
-        ARCH.shutdown(false);
+        // 7. boot app
+        APP_MANAGER.get().unwrap().run_next_app();
+        unsafe {
+                asm!("mv a0, {0}", in(reg) hartid, options(nomem));
+                boot_entry();
+        }
+
+        unreachable!();
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn hart_main(hartid: usize, opaque: usize) -> ! {
+extern "C" fn hart_main(hartid: usize, _opaque: usize) -> ! {
         unsafe {
                 KERNEL_STACK[hartid].load_as_stack(hartid); //init HartContext and TrapHandler
         }
@@ -96,12 +101,13 @@ fn print_kernel_mem() {
         unsafe {
                 info!("kernel memory map:");
                 info!("kernel base = {:<10p}", &skernel);
-                info!(".text     : [{:<10p}, {:<10p}]", &stext, &etext);
-                info!(".rodata   : [{:<10p}, {:<10p}]", &srodata, &erodata);
-                info!(".data     : [{:<10p}, {:<10p}]", &sdata, &edata);
-                info!(".bss.stack: [{:<10p}, {:<10p}]", &sstack, &estack);
-                info!(".bss.heap : [{:<10p}, {:<10p}]", &sheap, &eheap);
-                info!(".bss      : [{:<10p}, {:<10p}]", &sbss, &ebss);
+                info!(".text      : [{:<10p}, {:<10p}]", &stext, &etext);
+                info!(".rodata    : [{:<10p}, {:<10p}]", &srodata, &erodata);
+                info!(".data      : [{:<10p}, {:<10p}]", &sdata, &edata);
+                info!(".bss.kstack: [{:<10p}, {:<10p}]", &skstack, &ekstack);
+                info!(".bss.ustack: [{:<10p}, {:<10p}]", &sustack, &eustack);
+                info!(".bss.heap  : [{:<10p}, {:<10p}]", &sheap, &eheap);
+                info!(".bss       : [{:<10p}, {:<10p}]", &sbss, &ebss);
                 info!("kernel end = {:<10p}", &ekernel);
         }
 }
