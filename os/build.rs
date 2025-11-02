@@ -3,6 +3,8 @@ use std::fs;
 use std::fs::read_dir;
 use std::{env, path::PathBuf};
 
+use rustflags::Flag;
+
 fn main() {
         let arch = std::env::var("TARGET");
         let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
@@ -28,9 +30,29 @@ fn main() {
         build.compiler("riscv64-none-elf-gcc");
         build.file(app_data).flag("-mabi=lp64d").compile("app_data");
 
+        // set cfg 'has_frame_pointers'
+        if check_fp() {
+            println!("cargo:rustc-cfg=has_frame_pointers");
+        }
+
         println!("cargo:rustc-link-arg=-T{}", ld.display());
         println!("cargo:rustc-link-arg={}", "-Map=/tmp/pianoOSMap.map");
         println!("cargo:rustc-link-search={}", out.display());
+        println!("cargo::rustc-check-cfg=cfg(has_frame_pointers)");
+}
+
+fn check_fp() -> bool {
+    let mut fp_on = false;
+    for flag in rustflags::from_env() {
+        match flag {
+            Flag::Codegen { opt, value } if opt == "force-frame-pointers" => {
+                let v = value.as_deref().unwrap_or("yes");
+                fp_on = matches!(v, "y" | "yes" | "on" | "true");
+            }
+            _ => {}
+        }
+    }
+    fp_on
 }
 
 static TARGET_PATH: &str = "../user/binary/";

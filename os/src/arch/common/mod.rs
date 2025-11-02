@@ -17,6 +17,7 @@ pub use crate::arch::riscv::trap::fast_handler;
 // some common behavior
 pub trait ArchMem {
         unsafe fn fencei(&self);
+        fn unwind(&self);
 }
 
 pub trait ArchPower {

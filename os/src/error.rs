@@ -1,6 +1,8 @@
+use core::arch::asm;
 use core::panic::PanicInfo;
 
 use crate::arch::common::ArchPower;
+use crate::arch::common::ArchMem;
 use crate::devicetree::ParseDeviceTreeError;
 use crate::syscall::syscallid::SyscallError;
 use crate::global::ARCH;
@@ -17,6 +19,8 @@ fn panic(_info: &PanicInfo) -> ! {
         } else {
                 error!("Panic due to {}", _info.message());
         }
+        #[cfg(has_frame_pointers)]
+        ARCH.unwind();
 	ARCH.shutdown(true);
 }
 
