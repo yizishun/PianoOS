@@ -1,10 +1,12 @@
 const SYSCALL_WRITE: usize = 64;
 const SYSCALL_EXIT: usize = 93;
+const SYSCALL_GET_TASKID: usize = 1001;
 
 #[repr(usize)]
 pub enum SyscallID {
     	Write = SYSCALL_WRITE,
-    	Exit = SYSCALL_EXIT
+    	Exit = SYSCALL_EXIT,
+	GetTaskID = SYSCALL_GET_TASKID
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -18,6 +20,7 @@ impl TryFrom<usize> for SyscallID {
 		match value {
 			SYSCALL_WRITE => Ok(Self::Write),
 			SYSCALL_EXIT => Ok(Self::Exit),
+			SYSCALL_GET_TASKID => Ok(Self::GetTaskID),
 			_ => Err(SyscallError::InvalidSyscallID)
 		}
 	}

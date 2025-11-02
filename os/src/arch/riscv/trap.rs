@@ -204,6 +204,9 @@ pub extern "C" fn fast_handler(
     a6: usize,
     a7: usize,
 ) -> FastResult {
+    let save_regs = |ctx: &mut FastContext| {
+        ctx.regs().a = [ctx.a0(), a1, a2, a3, a4, a5, a6, a7];
+    };
     let scause = scause::read();
     let stval = stval::read();
     match scause.cause()
@@ -211,34 +214,37 @@ pub extern "C" fn fast_handler(
         .unwrap() {
 
         Trap::Exception(Exception::UserEnvCall) => {
-		unsafe {
-			sepc::write(sepc::read() + 4);
-			ctx.regs().a[0] = 
-				syscall(a7.try_into().unwrap(), [ctx.a0(), a1, a2]) as usize
-		}
-		FastResult::Restore
+            save_regs(&mut ctx);
+            unsafe {
+                sepc::write(sepc::read() + 4);
+                ctx.regs().a[0] = 
+                    syscall(a7.try_into().unwrap(), [ctx.a0(), a1, a2]) as usize
+            }
+            FastResult::Restore
         }
         Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::StorePageFault) => {
-		warn!("PageFault in application, kernel killed it.");
-		APP_MANAGER.get().unwrap().run_next_app();
-		unsafe {
-			sepc::write(crate::config::APP_BASE_ADDR);
-		}
-		FastResult::Restore
+            save_regs(&mut ctx);
+            warn!("PageFault in application, kernel killed it.");
+            APP_MANAGER.get().unwrap().run_next_app();
+            unsafe {
+                sepc::write(crate::config::APP_BASE_ADDR);
+            }
+            FastResult::Restore
         }
-	Trap::Exception(Exception::IllegalInstruction) => {
-		warn!("IllegalInstruction in application, kernel killed it.");
-		APP_MANAGER.get().unwrap().run_next_app();
-		unsafe {
-			sepc::write(crate::config::APP_BASE_ADDR);
-		}
-		FastResult::Restore
-	}
+        Trap::Exception(Exception::IllegalInstruction) => {
+            save_regs(&mut ctx);
+            warn!("IllegalInstruction in application, kernel killed it.");
+            APP_MANAGER.get().unwrap().run_next_app();
+            unsafe {
+                sepc::write(crate::config::APP_BASE_ADDR);
+            }
+            FastResult::Restore
+        }
 
         _ => {
-		panic!("Unsupported trap {:?}, stval = {:#x}!", scause.cause(), stval);
-	}
+            panic!("Unsupported trap {:?}, stval = {:#x}!", scause.cause(), stval);
+        }
     }
 }
 

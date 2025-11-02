@@ -1,5 +1,5 @@
 use super::write;
-use core::fmt::{self, Write};
+use core::fmt::{self, Error, Write};
 
 struct Stdout;
 
@@ -7,8 +7,12 @@ const STDOUT: usize = 1;
 
 impl Write for Stdout {
         fn write_str(&mut self, s: &str) -> fmt::Result {
-                write(STDOUT, s.as_bytes());
-                Ok(())
+                let size = write(STDOUT, s.as_bytes()) as usize;
+                if size < s.as_bytes().len() {
+                    Err(Error)
+                } else {
+                    Ok(())
+                }
         }
 }
 
