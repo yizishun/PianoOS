@@ -10,6 +10,8 @@ use log::info;
 use crate::arch::common::ArchTrap;
 use crate::arch::common::boot_entry;
 use crate::global::*;
+use crate::logging::PIANOLOGGER;
+use crate::logging::PianoLogger;
 use crate::{
 	harts::HartContext, batch::AppManager, mm::heap::heap_init, platform::Platform,
 };
@@ -49,6 +51,7 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	};
 
 	// 4. logging system init and print some infomation
+	PIANOLOGGER.call_once(|| { PianoLogger::set_boot_logger() });
 	logging::init().expect("Logging System init fail");
 	info!("Logging system init success");
 	info!("boot hartid: {}", hartid);
@@ -66,7 +69,12 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	APP_MANAGER.get().unwrap().print_app_info();
 
 	// 7. boot app
-	APP_MANAGER.get().unwrap().run_next_app();
+	//  switch logger
+	APP_MANAGER
+		.get()
+		.unwrap()
+		.run_next_app_in_boot();
+	PIANOLOGGER.get().unwrap().set_trap_logger();
 	unsafe {
 		asm!("mv a0, {0}", in(reg) hartid, options(nomem));
 		boot_entry();

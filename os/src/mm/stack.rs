@@ -1,4 +1,5 @@
 use core::intrinsics::forget;
+use core::ptr::NonNull;
 
 use crate::arch::common::ArchHarts;
 use crate::global::ARCH;
@@ -95,6 +96,7 @@ impl Stack {
     	pub fn load_as_stack(&'static mut self, hartid: usize) {
 		let hart_context = self.hart_context_mut();
 		let context_ptr = hart_context.context_ptr();
+		let hart_ptr = unsafe { NonNull::new_unchecked(hart_context) };
 		hart_context.init(hartid);
 
 		let range = self.0.as_ptr_range();
@@ -103,6 +105,7 @@ impl Stack {
 				range.start as usize.. range.end as usize, 
 				|_| {}, 
 				context_ptr,
+				hart_ptr,
 				fast_handler
 			).unwrap().load()
 		);

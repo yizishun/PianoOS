@@ -2,18 +2,20 @@
 pub const HART_INFO_SIZE: usize = size_of::<HartContext>();
 
 use core::ptr::NonNull;
+use core::arch::asm;
 
 // Make sure HartContext is aligned.
 //
 // HartContext will always at the end of Stack, so we should make sure
 // STACK_SIZE_PER_HART is a multiple of b.
-use crate::{arch::common::{ArchHarts, FlowContext}, config::STACK_SIZE, global::ARCH, mm::stack::Stack};
+use crate::{arch::common::{ArchHarts, FlowContext}, config::STACK_SIZE, global::ARCH, mm::stack::Stack, trap::{LoadedTrapStack, TrapHandler}};
 const _: () = assert!(STACK_SIZE % core::mem::align_of::<HartContext>() == 0);
 
 #[repr(C, align(128))]
 pub struct HartContext {
 	flow_context: crate::arch::common::FlowContext,
 	hartid: usize,
+	pub cur_app: usize
 }
 
 impl HartContext {
@@ -25,7 +27,7 @@ impl HartContext {
 		crate::PLATFORM.get().unwrap().board_info.cpu_num.unwrap()
 	}
 
-	pub fn get_hartid(&self) -> usize {
+	pub fn hartid(&self) -> usize {
 		self.hartid
 	}
 
@@ -36,16 +38,22 @@ impl HartContext {
 	}
 }
 
-/// helper function
-/// get current hart id, but call it after init HartContext in Stack and init sscratch to TrapHandler
-/// it will not work when in trap handler stage, because sscratch is saving user space sp
-/// when in trap handler stage, you can get hartid in ctx
-pub fn current_hartid_in_boot_stage() -> usize {
-	let scratch = ARCH.get_scratch();
-	let stack = scratch - Stack::stack_space_size() - Stack::hart_context_size();
-	let hart_context = stack as *const HartContext;
+pub fn hart_context_in_boot_stage() -> &'static mut HartContext {
+	let scratch = ARCH.get_scratch() as *mut TrapHandler;
+	let mut hart_context = unsafe { (*scratch).hart };
 	unsafe {
-		hart_context.as_ref().unwrap().get_hartid()
+		hart_context.as_mut()
+	}
+}
+
+pub fn hart_context_in_trap_stage() -> &'static mut HartContext {
+	let mut scratch: *mut TrapHandler;
+	unsafe {
+		asm!("mv {}, tp", out(reg) scratch);
+	}
+	let mut hart_context = unsafe { (*scratch).hart };
+	unsafe {
+		hart_context.as_mut()
 	}
 }
 

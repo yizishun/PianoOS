@@ -92,6 +92,7 @@ pub unsafe extern "C" fn trap_entry() {
 		save!(t4 => a0[5]),
 		save!(t5 => a0[6]),
 		save!(t6 => a0[7]),
+		save!(tp => a0[29]), //tp存放原sscratch值，在整个trap过程有效
 		// 调用快速路径函数
 		//
 		// | reg    | position
@@ -110,6 +111,7 @@ pub unsafe extern "C" fn trap_entry() {
 		// >
 		// > 若要切换上下文，在快速路径设置 gp/tp/sscratch/sepc 和 sstatus。
 		"mv   a0, sp",
+		"mv   tp, sp",
 		load!(sp[1] => ra),
 		"jalr ra",
 		"0:", // 加载上下文指针
@@ -179,6 +181,7 @@ pub unsafe extern "C" fn trap_entry() {
 		load!(a1[ 5] => t4),
 		load!(a1[ 6] => t5),
 		load!(a1[ 7] => t6),
+		load!(a1[29] => tp),
 		"1:", // 设置所有参数寄存器
 		load!(a1[10] => a2),
 		load!(a1[11] => a3),
@@ -218,28 +221,28 @@ pub extern "C" fn fast_handler(
 		unsafe {
 			sepc::write(sepc::read() + 4);
 			ctx.regs().a[0] = 
-			syscall(a7.try_into().unwrap(), [ctx.a0(), a1, a2]) as usize
+			syscall(a7.try_into().unwrap(), [ctx.a0(), a1, a2], &mut ctx) as usize
 		}
-		FastResult::Restore
+		ctx.restore()
 	}
 	Trap::Exception(Exception::StoreFault) |
 	Trap::Exception(Exception::StorePageFault) => {
 		save_regs(&mut ctx);
 		warn!("PageFault in application, kernel killed it.");
-		APP_MANAGER.get().unwrap().run_next_app();
+		APP_MANAGER.get().unwrap().run_next_app_in_trap();
 		unsafe {
 			sepc::write(crate::config::APP_BASE_ADDR);
 		}
-		FastResult::Restore
+		ctx.restore()
 	}
 	Trap::Exception(Exception::IllegalInstruction) => {
 		save_regs(&mut ctx);
 		warn!("IllegalInstruction in application, kernel killed it.");
-		APP_MANAGER.get().unwrap().run_next_app();
+		APP_MANAGER.get().unwrap().run_next_app_in_trap();
 		unsafe {
 			sepc::write(crate::config::APP_BASE_ADDR);
 		}
-		FastResult::Restore
+		ctx.restore()
 	}
 
 	_ => {

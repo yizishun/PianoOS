@@ -7,6 +7,7 @@ use crate::arch::common::{
 	ArchHarts
 };
 use crate::global::ARCH;
+use crate::harts::HartContext;
 
 use core::{
     alloc::Layout,
@@ -33,6 +34,7 @@ impl FreeTrapStack {
 	drop: fn(Range<usize>),
 
 	context_ptr: NonNull<FlowContext>,
+	hart_ptr: NonNull<HartContext>,
 	fast_handler: FastHandler,
     ) -> Result<Self, IllegalStack> {
 	const LAYOUT: Layout = Layout::new::<TrapHandler>();
@@ -44,6 +46,7 @@ impl FreeTrapStack {
 	    handler.range = range;
 	    handler.drop = drop;
 	    handler.context = context_ptr;
+	    handler.hart = hart_ptr;
 	    handler.fast_handler = fast_handler;
 	    Ok(Self(unsafe { NonNull::new_unchecked(handler) }))
 	} else {
@@ -108,34 +111,36 @@ impl Drop for LoadedTrapStack {
 /// 陷入处理器上下文。
 #[repr(C)]
 pub struct TrapHandler {
-    /// 指向一个陷入上下文的指针。
-    ///
-    /// # TODO
-    ///
-    /// 这个东西是怎么来的？生命周期是什么？
-    /// 似乎让它生命周期和陷入栈绑定也很合理。
-    /// 它可以交换，只是和陷入栈同时释放而已。
-    ///
-    /// - 发生陷入时，将寄存器保存到此对象。
-    /// - 离开陷入处理时，按此对象的内容设置寄存器。
-    context: NonNull<FlowContext>,
-    /// 快速路径函数。
-    ///
-    /// 必须在初始化陷入时设置好。
-    fast_handler: FastHandler,
-    /// 可在汇编使用的临时存储。
-    ///
-    /// - 在快速路径开始时暂存 a0。
-    /// - 在快速路径结束时保存完整路径函数。
-    scratch: usize,
+	/// 指向一个陷入上下文的指针。
+	///
+	/// # TODO
+	///
+	/// 这个东西是怎么来的？生命周期是什么？
+	/// 似乎让它生命周期和陷入栈绑定也很合理。
+	/// 它可以交换，只是和陷入栈同时释放而已。
+	///
+	/// - 发生陷入时，将寄存器保存到此对象。
+	/// - 离开陷入处理时，按此对象的内容设置寄存器。
+	context: NonNull<FlowContext>,
+	/// 快速路径函数。
+	///
+	/// 必须在初始化陷入时设置好。
+	fast_handler: FastHandler,
+	/// 可在汇编使用的临时存储。
+	///
+	/// - 在快速路径开始时暂存 a0。
+	/// - 在快速路径结束时保存完整路径函数。
+	scratch: usize,
+	/// 可以访问一些hart local，但是对于hart是全局的东西
+	pub hart: NonNull<HartContext>,
 
-    range: Range<usize>,
-    drop: fn(Range<usize>),
+	range: Range<usize>,
+	drop: fn(Range<usize>),
 
-    /// 禁止移动标记。
-    ///
-    /// `TrapHandler` 是放在其内部定义的 `block` 块里的，这是一种自引用结构，不能移动。
-    pinned: PhantomPinned,
+	/// 禁止移动标记。
+	///
+	/// `TrapHandler` 是放在其内部定义的 `block` 块里的，这是一种自引用结构，不能移动。
+	pinned: PhantomPinned,
 }
 
 impl TrapHandler {

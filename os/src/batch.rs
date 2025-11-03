@@ -6,6 +6,7 @@ use crate::global::{APP_MANAGER, ARCH};
 use crate::arch::common::ArchPower;
 use crate::config::MAX_APP_NUM;
 use crate::global::_num_app;
+use crate::harts::{hart_context_in_boot_stage, hart_context_in_trap_stage};
 pub struct AppManager {
 	num_app: usize,
 	next_app: Mutex<usize>,
@@ -56,9 +57,17 @@ impl AppManager {
 		}
 	}
 
-	pub fn run_next_app(&self) {
+	pub fn run_next_app_in_boot(&self) {
 		let mut next_app = self.next_app();
 		self.load_app(*next_app);
+		hart_context_in_boot_stage().cur_app = *next_app;
+		*next_app += 1;
+	}
+
+	pub fn run_next_app_in_trap(&self) {
+		let mut next_app = self.next_app();
+		self.load_app(*next_app);
+		hart_context_in_trap_stage().cur_app = *next_app;
 		*next_app += 1;
 	}
 }

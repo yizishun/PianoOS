@@ -1,4 +1,5 @@
 ﻿use core::{mem::MaybeUninit, ptr::NonNull};
+use crate::harts::HartContext;
 use crate::trap::TrapHandler;
 use crate::trap::entire::EntireHandler;
 use crate::arch::common::FlowContext;
@@ -35,6 +36,12 @@ impl FastContext {
 	#[inline]
 	pub fn regs(&mut self) -> &mut FlowContext {
 		unsafe { self.0.context.as_mut() }
+	}
+
+	/// 获取hart local的东西。
+	#[inline]
+	pub fn hart(&mut self) -> &mut HartContext {
+		unsafe { self.0.hart.as_mut() }
 	}
 
 	/// 交换上下文指针。
