@@ -16,16 +16,16 @@ pub use crate::arch::riscv::trap::fast_handler;
 
 // some common behavior
 pub trait ArchMem {
-        unsafe fn fencei(&self);
-        fn unwind(&self);
+	unsafe fn fencei(&self);
+	fn unwind(&self);
 }
 
 pub trait ArchPower {
-        fn shutdown(&self, fail: bool) -> !;
+	fn shutdown(&self, fail: bool) -> !;
 }
 
 pub trait ArchTime {
-        fn sleep(&self, sec: i32);
+	fn sleep(&self, sec: i32);
 }
 
 pub trait ArchHarts {
@@ -34,7 +34,7 @@ pub trait ArchHarts {
 }
 
 pub trait ArchTrap {
-        unsafe fn load_direct_trap_entry(&self);
+	unsafe fn load_direct_trap_entry(&self);
 }
 
 #[cfg(target_arch = "riscv64")]

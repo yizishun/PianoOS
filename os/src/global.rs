@@ -6,24 +6,24 @@ use crate::arch::common::Arch;
 use spin::Once;
 
 unsafe extern "C" {
-        pub static skernel: usize;
-        pub static stext: usize;
-        pub static etext: usize;
-        pub static srodata: usize;
-        pub static erodata: usize;
-        pub static sdata: usize;
-        pub static edata: usize;
-        pub static skstack: usize;
-        pub static ekstack: usize;
-        pub static sustack: usize;
-        pub static eustack: usize;
-        pub static sheap: usize;
-        pub static eheap: usize;
-        pub static sbss: usize;
-        pub static ebss: usize;
-        pub static ekernel: usize;
+	pub static skernel: usize;
+	pub static stext: usize;
+	pub static etext: usize;
+	pub static srodata: usize;
+	pub static erodata: usize;
+	pub static sdata: usize;
+	pub static edata: usize;
+	pub static skstack: usize;
+	pub static ekstack: usize;
+	pub static sustack: usize;
+	pub static eustack: usize;
+	pub static sheap: usize;
+	pub static eheap: usize;
+	pub static sbss: usize;
+	pub static ebss: usize;
+	pub static ekernel: usize;
 
-        pub static _num_app: usize;
+	pub static _num_app: usize;
 }
 
 pub static PLATFORM: Once<Platform> = Once::new();

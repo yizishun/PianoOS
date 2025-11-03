@@ -29,44 +29,44 @@ pub struct IllegalStack;
 impl FreeTrapStack {
     /// 在内存块上构造游离的陷入栈。
     pub fn new(
-        range: Range<usize>,
-        drop: fn(Range<usize>),
+	range: Range<usize>,
+	drop: fn(Range<usize>),
 
-        context_ptr: NonNull<FlowContext>,
-        fast_handler: FastHandler,
+	context_ptr: NonNull<FlowContext>,
+	fast_handler: FastHandler,
     ) -> Result<Self, IllegalStack> {
-        const LAYOUT: Layout = Layout::new::<TrapHandler>();
-        let bottom = range.start;
-        let top = range.end;
-        let ptr = (top - LAYOUT.size()) & !(LAYOUT.align() - 1);
-        if ptr >= bottom {
-            let handler = unsafe { &mut *(ptr as *mut TrapHandler) };
-            handler.range = range;
-            handler.drop = drop;
-            handler.context = context_ptr;
-            handler.fast_handler = fast_handler;
-            Ok(Self(unsafe { NonNull::new_unchecked(handler) }))
-        } else {
-            Err(IllegalStack)
-        }
+	const LAYOUT: Layout = Layout::new::<TrapHandler>();
+	let bottom = range.start;
+	let top = range.end;
+	let ptr = (top - LAYOUT.size()) & !(LAYOUT.align() - 1);
+	if ptr >= bottom {
+	    let handler = unsafe { &mut *(ptr as *mut TrapHandler) };
+	    handler.range = range;
+	    handler.drop = drop;
+	    handler.context = context_ptr;
+	    handler.fast_handler = fast_handler;
+	    Ok(Self(unsafe { NonNull::new_unchecked(handler) }))
+	} else {
+	    Err(IllegalStack)
+	}
     }
 
     /// 将这个陷入栈加载为预备陷入栈。
     #[inline]
     pub fn load(self) -> LoadedTrapStack {
-        let scratch = ARCH.exchange_scratch(self.0.as_ptr() as _);
-        forget(self);
-        LoadedTrapStack(scratch)
+	let scratch = ARCH.exchange_scratch(self.0.as_ptr() as _);
+	forget(self);
+	LoadedTrapStack(scratch)
     }
 }
 
 impl Drop for FreeTrapStack {
     #[inline]
     fn drop(&mut self) {
-        unsafe {
-            let handler = self.0.as_ref();
-            (handler.drop)(handler.range.clone());
-        }
+	unsafe {
+	    let handler = self.0.as_ref();
+	    (handler.drop)(handler.range.clone());
+	}
     }
 }
 
@@ -74,15 +74,15 @@ impl LoadedTrapStack {
     /// 获取从 `sscratch` 寄存器中换出的值。
     #[inline]
     pub const fn val(&self) -> usize {
-        self.0
+	self.0
     }
 
     /// 卸载陷入栈。
     #[inline]
     pub fn unload(self) -> FreeTrapStack {
-        let ans = unsafe { self.unload_unchecked() };
-        forget(self);
-        ans
+	let ans = unsafe { self.unload_unchecked() };
+	forget(self);
+	ans
     }
 
     /// 卸载但不消费所有权。
@@ -92,16 +92,16 @@ impl LoadedTrapStack {
     /// 间接复制了所有权。用于 `Drop`。
     #[inline]
     unsafe fn unload_unchecked(&self) -> FreeTrapStack {
-        let ptr = ARCH.exchange_scratch(self.0) as *mut TrapHandler;
-        let handler = unsafe { NonNull::new_unchecked(ptr) };
-        FreeTrapStack(handler)
+	let ptr = ARCH.exchange_scratch(self.0) as *mut TrapHandler;
+	let handler = unsafe { NonNull::new_unchecked(ptr) };
+	FreeTrapStack(handler)
     }
 }
 
 impl Drop for LoadedTrapStack {
     #[inline]
     fn drop(&mut self) {
-        drop(unsafe { self.unload_unchecked() })
+	drop(unsafe { self.unload_unchecked() })
     }
 }
 
@@ -143,8 +143,8 @@ impl TrapHandler {
     /// 用这个方法找到栈底的一个对齐的位置。
     #[inline]
     fn locate_fast_mail<T>(&mut self) -> *mut MaybeUninit<T> {
-        let top = self.range.end as *mut u8;
-        let offset = top.align_offset(align_of::<T>());
-        unsafe { &mut *top.add(offset).cast() }
+	let top = self.range.end as *mut u8;
+	let offset = top.align_offset(align_of::<T>());
+	unsafe { &mut *top.add(offset).cast() }
     }
 }

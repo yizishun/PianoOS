@@ -12,7 +12,7 @@ pub struct RiscvVirt;
 pub struct Riscv64<C>(PhantomData<C>);
 
 impl<C> Riscv64<C> {
-    pub const fn new() -> Self {
-	    Riscv64::<C>(PhantomData)
-    }
+    	pub const fn new() -> Self {
+		Riscv64::<C>(PhantomData)
+    	}
 }

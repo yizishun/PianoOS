@@ -81,12 +81,12 @@ impl Stack {
 
     	/// get mut hartContext in stack
     	pub fn hart_context_mut(&mut self) -> &mut HartContext {
-        	unsafe { &mut *self.0.as_mut_ptr().cast() }
+		unsafe { &mut *self.0.as_mut_ptr().cast() }
     	}
 
     	/// get hartContext in stack
     	pub fn hart_context(&mut self) -> &HartContext {
-        	unsafe { & *self.0.as_mut_ptr().cast() }
+		unsafe { & *self.0.as_mut_ptr().cast() }
     	}
 
 	/// Initializes stack for trap handling.

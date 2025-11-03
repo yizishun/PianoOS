@@ -2,9 +2,9 @@ pub mod entry;
 pub mod trap;
 
 pub fn shutdown(fail: bool) -> ! {
-        loop {}
+	loop {}
 }
 
 pub fn sleep(sec: i32) {
-        todo!("la sleep");
+	todo!("la sleep");
 }
