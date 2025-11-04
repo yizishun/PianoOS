@@ -2,13 +2,15 @@ use log::info;
 use spin::{Mutex, MutexGuard};
 use strum::IntoEnumIterator;
 
-use crate::arch::common::ArchMem;
+use crate::arch::common::{ArchMem, ArchTime};
 use crate::global::{APP_MANAGER, ARCH};
 use crate::arch::common::ArchPower;
 use crate::config::MAX_APP_NUM;
 use crate::global::_num_app;
 use crate::harts::{hart_context_in_boot_stage, hart_context_in_trap_stage};
 use crate::syscall::syscallid::SyscallID;
+use alloc::collections::BTreeMap;
+use log::trace;
 pub struct AppManager {
 	num_app: usize,
 	next_app: Mutex<usize>,
@@ -62,18 +64,69 @@ impl AppManager {
 	pub fn run_next_app_in_boot(&self) {
 		let mut next_app = self.next_app();
 		self.load_app(*next_app);
-		hart_context_in_boot_stage().cur_app = *next_app;
+		hart_context_in_boot_stage().app_info.start(*next_app);
 		*next_app += 1;
 	}
 
 	pub fn run_next_app_in_trap(&self) {
 		let mut next_app = self.next_app();
 		self.load_app(*next_app);
-		let hart_context = hart_context_in_trap_stage();
-		hart_context.cur_app = *next_app;
-		for syscall in SyscallID::iter() {
-			*hart_context.syscall_record.get_mut(&syscall).unwrap() = 0;
-		}
+		hart_context_in_trap_stage().app_info.start(*next_app);
 		*next_app += 1;
+	}
+}
+
+pub struct AppInfo {
+	pub cur_app: usize,
+	pub syscall_record: BTreeMap<SyscallID, usize>,
+	pub start_time: usize,
+	pub end_time: usize
+}
+
+impl AppInfo {
+	pub fn new() -> Self {
+		let mut record = BTreeMap::new();
+		for syscall in SyscallID::iter() {
+			record.insert(syscall, 0);
+		}
+		AppInfo { 
+			cur_app: 0, 
+			syscall_record: record,
+			start_time: 0,
+			end_time: 0
+		}
+	}
+
+	pub fn start(&mut self, cur_app: usize) {
+		self.cur_app = cur_app;
+		self.clear_syscall_record();
+		self.start_time = ARCH.time_ns();
+	}
+
+	pub fn end(&mut self) {
+		self.end_time = ARCH.time_ns();
+		self.print_app_statistics();
+	}
+
+	pub fn print_app_statistics(&self) {
+		trace!("==== App statistics ====");
+		trace!("Start time: {}ns", self.start_time);
+		trace!("End time  : {}ns", self.end_time);
+		trace!("Total time: {}ns", self.end_time - self.start_time);
+		trace!("Syscall statistics --");
+		self.print_syscall_record();
+		trace!("== App statistics end ==");
+	}
+
+	pub fn print_syscall_record(&self) {
+		for (syscall, count) in &self.syscall_record {
+			trace!("{}: {}", syscall, count);
+		}
+	}
+
+	pub fn clear_syscall_record(&mut self) {
+		for syscall in SyscallID::iter() {
+			*self.syscall_record.get_mut(&syscall).unwrap() = 0;
+		}
 	}
 }

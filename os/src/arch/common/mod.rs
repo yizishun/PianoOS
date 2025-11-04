@@ -26,6 +26,7 @@ pub trait ArchPower {
 
 pub trait ArchTime {
 	fn sleep(&self, sec: i32);
+	fn time_ns(&self) -> usize;
 }
 
 pub trait ArchHarts {

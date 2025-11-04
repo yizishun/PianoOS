@@ -13,4 +13,9 @@ impl ArchTime for Riscv64<RiscvVirt> {
 		sbi_rt::set_timer(time_end as u64);
 		riscv::asm::wfi();
 	}
+
+	fn time_ns(&self) -> usize {
+	    	let time = time::read64();
+		((1000u64 / VIRT_FREQUNCY as u64) * time) as usize
+	}
 }

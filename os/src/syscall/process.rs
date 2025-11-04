@@ -5,8 +5,7 @@ use crate::harts::hart_context_in_trap_stage;
 use crate::info;
 
 pub fn sys_exit(xstate: i32) -> isize {
-	let hart_context = hart_context_in_trap_stage();
-	hart_context.print_syscall_record();
+	hart_context_in_trap_stage().app_info.end();
 	info!("Application exited with code {}", xstate);
 	APP_MANAGER.get().unwrap().run_next_app_in_trap();
 	unsafe {

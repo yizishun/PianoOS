@@ -228,7 +228,7 @@ pub extern "C" fn fast_handler(
 	Trap::Exception(Exception::StoreFault) |
 	Trap::Exception(Exception::StorePageFault) => {
 		save_regs(&mut ctx);
-		hart_context_in_trap_stage().print_syscall_record();
+		ctx.hart().app_info.end();
 		warn!("PageFault in application, kernel killed it.");
 		APP_MANAGER.get().unwrap().run_next_app_in_trap();
 		unsafe {
@@ -238,7 +238,7 @@ pub extern "C" fn fast_handler(
 	}
 	Trap::Exception(Exception::IllegalInstruction) => {
 		save_regs(&mut ctx);
-		hart_context_in_trap_stage().print_syscall_record();
+		ctx.hart().app_info.end();
 		warn!("IllegalInstruction in application, kernel killed it.");
 		APP_MANAGER.get().unwrap().run_next_app_in_trap();
 		unsafe {
