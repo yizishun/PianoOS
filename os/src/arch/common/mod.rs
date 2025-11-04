@@ -9,6 +9,8 @@ pub use crate::arch::riscv::entry;
 // app boot enrty
 #[cfg(target_arch = "riscv64")]
 pub use crate::arch::riscv::trap::boot_entry;
+#[cfg(target_arch = "riscv64")]
+pub use crate::arch::riscv::trap::boot_handler;
 
 // fast handler
 #[cfg(target_arch = "riscv64")]

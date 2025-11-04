@@ -9,6 +9,7 @@ use log::info;
 
 use crate::arch::common::ArchTrap;
 use crate::arch::common::boot_entry;
+use crate::arch::common::boot_handler;
 use crate::global::*;
 use crate::logging::PIANOLOGGER;
 use crate::logging::PianoLogger;
@@ -76,6 +77,7 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 		.run_next_app_in_boot();
 	PIANOLOGGER.get().unwrap().set_trap_logger();
 	unsafe {
+		boot_handler();
 		asm!("mv a0, {0}", in(reg) hartid, options(nomem));
 		boot_entry();
 	}

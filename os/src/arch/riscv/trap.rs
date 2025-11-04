@@ -278,10 +278,8 @@ pub unsafe extern "C" fn boot_entry() -> ! {
 	naked_asm!(
 		".align 2",
 		// sscratch is set in load_as_stack in main
-		"call {boot_handler}",
 		"call {locate}",
 		"sret",
-		boot_handler = sym boot_handler,
 		locate = sym locate_user_stack
 
 	)
