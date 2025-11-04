@@ -33,7 +33,7 @@ fn check_buf_valid(buf: *const u8, len: usize) -> bool {
 	let app_stack_range = unsafe { USER_STACK[harid].as_ptr_range() };
 	if unsafe { 
 		(app_range.contains(&buf) && app_range.contains(&buf.add(len))) ||
-		(app_stack_range.contains(&buf) && app_range.contains(&buf.add(len)))
+		(app_stack_range.contains(&buf) && app_stack_range.contains(&buf.add(len)))
 	} {
 		true
 	}
