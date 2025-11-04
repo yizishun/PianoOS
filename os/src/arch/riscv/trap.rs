@@ -5,7 +5,7 @@ use riscv::interrupt::supervisor::Exception;
 use riscv::register::{scause, stval};
 use riscv::register::mcause::Trap;
 
-use crate::arch::{common::ArchTrap, riscv::Riscv64};
+use crate::{arch::{common::ArchTrap, riscv::Riscv64}, harts::hart_context_in_trap_stage};
 use crate::APP_MANAGER;
 use crate::syscall::syscall;
 use crate::trap::fast::FastResult;
@@ -221,13 +221,14 @@ pub extern "C" fn fast_handler(
 		unsafe {
 			sepc::write(sepc::read() + 4);
 			ctx.regs().a[0] = 
-			syscall(a7.try_into().unwrap(), [ctx.a0(), a1, a2], &mut ctx) as usize
+			syscall(a7.try_into().unwrap(), [ctx.a0(), a1, a2]) as usize
 		}
 		ctx.restore()
 	}
 	Trap::Exception(Exception::StoreFault) |
 	Trap::Exception(Exception::StorePageFault) => {
 		save_regs(&mut ctx);
+		hart_context_in_trap_stage().print_syscall_record();
 		warn!("PageFault in application, kernel killed it.");
 		APP_MANAGER.get().unwrap().run_next_app_in_trap();
 		unsafe {
@@ -237,6 +238,7 @@ pub extern "C" fn fast_handler(
 	}
 	Trap::Exception(Exception::IllegalInstruction) => {
 		save_regs(&mut ctx);
+		hart_context_in_trap_stage().print_syscall_record();
 		warn!("IllegalInstruction in application, kernel killed it.");
 		APP_MANAGER.get().unwrap().run_next_app_in_trap();
 		unsafe {

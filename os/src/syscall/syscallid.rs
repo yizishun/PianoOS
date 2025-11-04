@@ -1,7 +1,9 @@
+use strum_macros::EnumIter;
 const SYSCALL_WRITE: usize = 64;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_GET_TASKID: usize = 1001;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumIter)]
 #[repr(usize)]
 pub enum SyscallID {
     	Write = SYSCALL_WRITE,
@@ -22,6 +24,16 @@ impl TryFrom<usize> for SyscallID {
 			SYSCALL_EXIT => Ok(Self::Exit),
 			SYSCALL_GET_TASKID => Ok(Self::GetTaskID),
 			_ => Err(SyscallError::InvalidSyscallID)
+		}
+	}
+}
+
+impl core::fmt::Display for SyscallID {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		match self {
+			Self::Exit => write!(f, "Exit"),
+			Self::GetTaskID => write!(f, "GetTaskID"),
+			Self::Write => write!(f, "Write"),
 		}
 	}
 }

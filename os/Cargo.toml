@@ -12,6 +12,8 @@ serde-device-tree = { git = "https://github.com/rustsbi/serde-device-tree", rev 
 buddy_system_allocator = "0.11.0"
 uart16550 = "0.0.1"
 spin = "0.10.0"
+strum_macros = "0.27.2"
+strum = { version = "0.27.2", default-features = false }
 
 [build-dependencies]
 cc = "1"

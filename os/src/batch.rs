@@ -1,5 +1,6 @@
 use log::info;
 use spin::{Mutex, MutexGuard};
+use strum::IntoEnumIterator;
 
 use crate::arch::common::ArchMem;
 use crate::global::{APP_MANAGER, ARCH};
@@ -7,6 +8,7 @@ use crate::arch::common::ArchPower;
 use crate::config::MAX_APP_NUM;
 use crate::global::_num_app;
 use crate::harts::{hart_context_in_boot_stage, hart_context_in_trap_stage};
+use crate::syscall::syscallid::SyscallID;
 pub struct AppManager {
 	num_app: usize,
 	next_app: Mutex<usize>,
@@ -67,7 +69,11 @@ impl AppManager {
 	pub fn run_next_app_in_trap(&self) {
 		let mut next_app = self.next_app();
 		self.load_app(*next_app);
-		hart_context_in_trap_stage().cur_app = *next_app;
+		let hart_context = hart_context_in_trap_stage();
+		hart_context.cur_app = *next_app;
+		for syscall in SyscallID::iter() {
+			*hart_context.syscall_record.get_mut(&syscall).unwrap() = 0;
+		}
 		*next_app += 1;
 	}
 }

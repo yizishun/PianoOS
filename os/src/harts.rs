@@ -1,26 +1,35 @@
-
+extern crate alloc;
 pub const HART_INFO_SIZE: usize = size_of::<HartContext>();
 
 use core::ptr::NonNull;
 use core::arch::asm;
 
+use alloc::collections::btree_map::BTreeMap;
+use log::{info, trace};
+use strum::IntoEnumIterator;
+
 // Make sure HartContext is aligned.
 //
 // HartContext will always at the end of Stack, so we should make sure
 // STACK_SIZE_PER_HART is a multiple of b.
-use crate::{arch::common::{ArchHarts, FlowContext}, config::STACK_SIZE, global::ARCH, mm::stack::Stack, trap::{LoadedTrapStack, TrapHandler}};
+use crate::{arch::common::{ArchHarts, FlowContext}, config::STACK_SIZE, global::ARCH, mm::stack::Stack, syscall::syscallid::SyscallID, trap::{LoadedTrapStack, TrapHandler}};
 const _: () = assert!(STACK_SIZE % core::mem::align_of::<HartContext>() == 0);
 
 #[repr(C, align(128))]
 pub struct HartContext {
 	flow_context: crate::arch::common::FlowContext,
 	hartid: usize,
-	pub cur_app: usize
+	pub cur_app: usize,
+	pub syscall_record: BTreeMap<SyscallID, usize>
 }
 
 impl HartContext {
 	pub fn init(&mut self, hartid: usize){
 		self.hartid = hartid;
+		self.syscall_record = BTreeMap::new();
+		for syscall in SyscallID::iter() {
+			self.syscall_record.insert(syscall, 0);
+		}
 	}
 
 	pub fn get_hartnum() -> usize {
@@ -35,6 +44,14 @@ impl HartContext {
 		unsafe {
 			NonNull::new_unchecked(&mut self.flow_context)
 		}
+	}
+
+	pub fn print_syscall_record(&self) {
+		trace!("==== syscall statistics ====");
+		for (syscall, count) in &self.syscall_record {
+			trace!("{}: {}", syscall, count);
+		}
+		trace!("== syscall statistics end ==");
 	}
 }
 
