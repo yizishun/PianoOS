@@ -35,6 +35,10 @@ pub struct Stack([u8; STACK_SIZE]);
 impl Stack {
     	pub const ZERO: Self = Self([0; STACK_SIZE]);
 
+	pub fn as_ptr_range(&self) -> core::ops::Range<*const u8>{
+		self.0.as_ptr_range()
+	}
+
 	/// get hart context size
 	pub const fn hart_context_size() -> usize {
 		size_of::<HartContext>()

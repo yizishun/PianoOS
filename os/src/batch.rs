@@ -40,6 +40,13 @@ impl AppManager {
 		}
 	}
 
+	pub fn app_size(&self, app_id: usize) -> usize {
+		assert!(app_id < self.num_app, "Invalid app id {}", app_id);
+		let size: isize = (self.app_start_addr[app_id + 1] - self.app_start_addr[app_id]) as isize;
+		assert!(size >= 0, "app size is nagative");
+		size as usize
+	}
+
 	pub fn next_app(&self) -> MutexGuard<usize> {
 		self.next_app.lock()
 	}

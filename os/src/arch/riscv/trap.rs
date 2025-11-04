@@ -232,8 +232,8 @@ pub extern "C" fn fast_handler(
 		save_regs(&mut ctx);
 		ctx.hart().app_info.end();
 		warn!("PageFault in application, kernel killed it.");
-		warn!("Illegal addr: {}", stval);
-		warn!("excption pc: {}", sepc::read());
+		warn!("Illegal addr: 0x{:x}", stval);
+		warn!("excption pc: 0x{:x}", sepc::read());
 		APP_MANAGER.get().unwrap().run_next_app_in_trap();
 		unsafe {
 			sepc::write(crate::config::APP_BASE_ADDR);
@@ -244,7 +244,7 @@ pub extern "C" fn fast_handler(
 		save_regs(&mut ctx);
 		ctx.hart().app_info.end();
 		warn!("IllegalInstruction in application, kernel killed it.");
-		warn!("excption pc: {}", sepc::read());
+		warn!("excption pc: 0x{:x}", sepc::read());
 		APP_MANAGER.get().unwrap().run_next_app_in_trap();
 		unsafe {
 			sepc::write(crate::config::APP_BASE_ADDR);
@@ -257,8 +257,8 @@ pub extern "C" fn fast_handler(
 		save_regs(&mut ctx);
 		ctx.hart().app_info.end();
 		warn!("Instruction PageFault in application, kernel killed it.");
-		warn!("Illegal addr: {}", stval);
-		warn!("excption pc: {}", sepc::read());
+		warn!("Illegal addr: 0x{:x}", stval);
+		warn!("excption pc: 0x{:x}", sepc::read());
 		APP_MANAGER.get().unwrap().run_next_app_in_trap();
 		unsafe {
 			sepc::write(crate::config::APP_BASE_ADDR);
