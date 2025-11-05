@@ -4,6 +4,7 @@
 #![feature(core_intrinsics)]
 
 use core::arch::asm;
+use core::intrinsics::unreachable;
 
 use log::info;
 
@@ -59,23 +60,23 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	info!("device tree addr: {:p}", device_tree as *const u8);
 	PLATFORM.get().unwrap().print_platform_info();
 
-	// 5. boot hart start other harts
+	// 5. print some kernel info and app info
+	print_kernel_mem();
+	APP_MANAGER.get().unwrap().print_app_info();
+
+	// 6. boot hart start other harts
+	//  switch logger
+	PIANOLOGGER.get().unwrap().set_trap_logger();
 	for i in 0..HartContext::get_hartnum() {
 		let start_addr = arch::common::entry::hart_start as usize;
 		sbi_rt::hart_start(i, start_addr, 0);
 	}
 
-	// 6. print some kernel info and app info
-	print_kernel_mem();
-	APP_MANAGER.get().unwrap().print_app_info();
-
 	// 7. boot app
-	//  switch logger
 	APP_MANAGER
 		.get()
 		.unwrap()
 		.run_next_app_in_boot();
-	PIANOLOGGER.get().unwrap().set_trap_logger();
 	unsafe {
 		boot_handler();
 		asm!("mv a0, {0}", in(reg) hartid, options(nomem));
@@ -88,10 +89,21 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 #[unsafe(no_mangle)]
 extern "C" fn hart_main(hartid: usize, _opaque: usize) -> ! {
 	unsafe {
+		ARCH.load_direct_trap_entry(); // set stvec
 		KERNEL_STACK[hartid].load_as_stack(hartid); //init HartContext and TrapHandler
 	}
-	info!("hart {} boot success", hartid);
-	loop {}
+
+	APP_MANAGER
+		.get()
+		.unwrap()
+		.run_next_app_in_boot();
+	unsafe {
+		boot_handler();
+		asm!("mv a0, {0}", in(reg) hartid, options(nomem));
+		boot_entry();
+	}
+
+	unreachable!();
 }
 
 fn clear_bss() {

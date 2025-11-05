@@ -59,7 +59,7 @@ impl AppManager {
 	pub fn load_app(&self, app_id: usize) -> Range<*const u8>{
 		use crate::config::APP_BASE_ADDR;
 		if app_id >= self.num_app {
-			info!("All applications completed! Kennel shutdown");
+			info!("All applications completed! Kennel shutdown"); //TODO:这个打印要是发生在boot time就会出错
 			ARCH.shutdown(false);
 		}
 		let app_addr_start = *self.app_start_addr.get(app_id).unwrap();
@@ -67,7 +67,6 @@ impl AppManager {
 		let app_addr_off = app_addr_start - *self.app_start_addr.get(0).unwrap();
 		let count = app_addr_end - app_addr_start;
 		let dst = (APP_BASE_ADDR + app_addr_off) as *mut u8;
-		info!("Kernel loading app({app_id})");
 		unsafe {
 			core::ptr::copy_nonoverlapping(app_addr_start as *const u8, dst, count);
 			ARCH.fencei();
@@ -88,6 +87,7 @@ impl AppManager {
 	pub fn run_next_app_in_trap(&self) {
 		let mut next_app = self.next_app();
 		let app_range = self.load_app(*next_app);
+		info!("Kernel loading app({})", *next_app);
 		hart_context_in_trap_stage().app_info.start(*next_app, app_range.clone());
 		*next_app += 1;
 		unsafe {
