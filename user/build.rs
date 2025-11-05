@@ -27,11 +27,8 @@ const RISCV_LINKER_SCRIPT: &[u8] = b"
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
-BASE_ADDRESS = 0x80400000;
-
 SECTIONS
 {
-    . = BASE_ADDRESS;
     .text : {
         *(.text.entry)
         *(.text .text.*)
