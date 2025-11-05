@@ -18,7 +18,7 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
 			len as isize
 		}
 		_ => {
-			panic!("Unsupported fd in sys_write"); //TODO: kenel panic is not a good choice
+			-1
 		}
 	}
 }

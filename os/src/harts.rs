@@ -8,8 +8,8 @@ use core::arch::asm;
 //
 // HartContext will always at the end of Stack, so we should make sure
 // STACK_SIZE_PER_HART is a multiple of b.
-use crate::{arch::common::{ArchHarts, FlowContext}, batch::AppInfo, config::STACK_SIZE, global::ARCH, mm::stack::Stack, syscall::syscallid::SyscallID, trap::{LoadedTrapStack, TrapHandler}};
-const _: () = assert!(STACK_SIZE % core::mem::align_of::<HartContext>() == 0);
+use crate::{arch::common::{ArchHarts, FlowContext}, batch::AppInfo, config::KERNEL_STACK_SIZE, global::ARCH, trap::TrapHandler};
+const _: () = assert!(KERNEL_STACK_SIZE % core::mem::align_of::<HartContext>() == 0);
 
 #[repr(C, align(128))]
 pub struct HartContext {

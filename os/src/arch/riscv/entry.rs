@@ -1,5 +1,5 @@
 #![cfg(target_arch = "riscv64")]
-use crate::{config::STACK_SIZE, global::KERNEL_STACK, trap::TrapHandler};
+use crate::{config::KERNEL_STACK_SIZE, global::KERNEL_STACK, trap::TrapHandler};
 use core::arch::naked_asm;
 
 /// Move stack to keep a space for TrapHandler
@@ -31,7 +31,7 @@ pub(crate) unsafe extern "C" fn locate() {
 	    call t1, {move_stack}       // Call stack reuse function
 	    ret                         // Return
 	",
-	per_hart_stack_size = const STACK_SIZE,
+	per_hart_stack_size = const KERNEL_STACK_SIZE,
 	stack               =   sym KERNEL_STACK,
 	move_stack          =   sym reuse_stack_for_trap,
     )

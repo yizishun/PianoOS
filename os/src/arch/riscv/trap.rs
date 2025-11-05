@@ -307,7 +307,7 @@ pub(crate) unsafe extern "C" fn locate_user_stack() {
 	    bnez t1, 1b                 // Loop if not zero
 	    ret                         // Return
 	",
-	per_hart_stack_size = const crate::config::STACK_SIZE,
+	per_hart_stack_size = const crate::config::USER_STACK_SIZE,
 	stack               =   sym crate::USER_STACK,
     )
 }

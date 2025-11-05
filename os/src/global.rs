@@ -1,6 +1,6 @@
 use crate::batch::AppManager;
 use crate::config::NUM_HART_MAX;
-use crate::mm::stack::Stack;
+use crate::mm::stack::{KernelStack, UserStack};
 use crate::platform::Platform;
 use crate::arch::common::Arch;
 use spin::Once;
@@ -31,9 +31,9 @@ pub static PLATFORM: Once<Platform> = Once::new();
 pub static APP_MANAGER: Once<AppManager> = Once::new();
 
 #[unsafe(link_section = ".bss.kstack")]
-pub static mut KERNEL_STACK: [Stack; NUM_HART_MAX] = [Stack::ZERO; NUM_HART_MAX];
+pub static mut KERNEL_STACK: [KernelStack; NUM_HART_MAX] = [KernelStack::ZERO; NUM_HART_MAX];
 
 #[unsafe(link_section = ".bss.ustack")]
-pub static mut USER_STACK: [Stack; NUM_HART_MAX] = [Stack::ZERO; NUM_HART_MAX];
+pub static mut USER_STACK: [UserStack; NUM_HART_MAX] = [UserStack::ZERO; NUM_HART_MAX];
 
 pub static ARCH: Arch = Arch::new();

@@ -3,18 +3,29 @@ use core::ptr::NonNull;
 
 use crate::arch::common::ArchHarts;
 use crate::global::ARCH;
-use crate::{harts::HartContext, config::STACK_SIZE};
+use crate::{harts::HartContext, config::{USER_STACK_SIZE, KERNEL_STACK_SIZE}};
 use crate::trap::{FreeTrapStack, TrapHandler};
 use crate::arch::common::fast_handler;
 
 // Make sure stack address can be aligned.
-const _: () = assert!(STACK_SIZE % align_of::<Stack>() == 0);
+const _: () = assert!(KERNEL_STACK_SIZE % align_of::<KernelStack>() == 0);
 
 // Make sure alignment of TrapHandler is smaller than Stack
-const _: () = assert!(align_of::<Stack>() >= align_of::<TrapHandler>());
+const _: () = assert!(align_of::<KernelStack>() >= align_of::<TrapHandler>());
 
 #[repr(C, align(128))]
-pub struct Stack([u8; STACK_SIZE]);
+pub struct UserStack([u8; USER_STACK_SIZE]);
+
+impl UserStack {
+    	pub const ZERO: Self = Self([0; USER_STACK_SIZE]);
+	
+	pub fn as_ptr_range(&self) -> core::ops::Range<*const u8>{
+		self.0.as_ptr_range()
+	}
+}
+
+#[repr(C, align(128))]
+pub struct KernelStack([u8; KERNEL_STACK_SIZE]);
 
 //                      Stack
 //     low_addr   +----HartContext---+
@@ -32,8 +43,8 @@ pub struct Stack([u8; STACK_SIZE]);
 //                | drop(ptr)        |
 //                | ...(unalign)     |
 //     hign addr  +------------------+
-impl Stack {
-    	pub const ZERO: Self = Self([0; STACK_SIZE]);
+impl KernelStack {
+    	pub const ZERO: Self = Self([0; KERNEL_STACK_SIZE]);
 
 	pub fn as_ptr_range(&self) -> core::ops::Range<*const u8>{
 		self.0.as_ptr_range()
@@ -46,8 +57,8 @@ impl Stack {
 
 	/// get trap handler size
 	pub const fn trap_handler_size() -> usize {
-		STACK_SIZE -
-			(STACK_SIZE - size_of::<TrapHandler>()) & !(align_of::<TrapHandler>() - 1)
+		KERNEL_STACK_SIZE -
+			(KERNEL_STACK_SIZE - size_of::<TrapHandler>()) & !(align_of::<TrapHandler>() - 1)
 	}
 
 	pub const fn stack_space_size() -> usize {
