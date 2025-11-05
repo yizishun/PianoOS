@@ -70,8 +70,6 @@ pub struct FlowContext {
 	pub tp: usize,      // 29..
 	pub sp: usize,      // 30..
 	pub pc: usize,      // 31..
-	pub sstatus: Sstatus,
-	pub sepc: usize,
 }
 
 #[unsafe(naked)]
@@ -235,9 +233,6 @@ pub extern "C" fn fast_handler(
 		warn!("Illegal addr: 0x{:x}", stval);
 		warn!("excption pc: 0x{:x}", sepc::read());
 		APP_MANAGER.get().unwrap().run_next_app_in_trap();
-		unsafe {
-			sepc::write(crate::config::APP_BASE_ADDR);
-		}
 		ctx.restore()
 	}
 	Trap::Exception(Exception::IllegalInstruction) => {
@@ -246,9 +241,6 @@ pub extern "C" fn fast_handler(
 		warn!("IllegalInstruction in application, kernel killed it.");
 		warn!("excption pc: 0x{:x}", sepc::read());
 		APP_MANAGER.get().unwrap().run_next_app_in_trap();
-		unsafe {
-			sepc::write(crate::config::APP_BASE_ADDR);
-		}
 		ctx.restore()
 	}
 	Trap::Exception(Exception::InstructionFault) |
@@ -260,9 +252,6 @@ pub extern "C" fn fast_handler(
 		warn!("Illegal addr: 0x{:x}", stval);
 		warn!("excption pc: 0x{:x}", sepc::read());
 		APP_MANAGER.get().unwrap().run_next_app_in_trap();
-		unsafe {
-			sepc::write(crate::config::APP_BASE_ADDR);
-		}
 		ctx.restore()
 	}
 
@@ -288,7 +277,6 @@ pub unsafe extern "C" fn boot_entry() -> ! {
 pub extern "C" fn boot_handler() {
 	unsafe {
 		sstatus::set_spp(SPP::User);
-		sepc::write(crate::config::APP_BASE_ADDR);
 	}
 }
 

@@ -1,4 +1,8 @@
+use core::ops::Range;
+use core::ptr::null;
+
 use log::info;
+use riscv::register::mstatus::set_fs;
 use spin::{Mutex, MutexGuard};
 use strum::IntoEnumIterator;
 
@@ -11,6 +15,7 @@ use crate::harts::{hart_context_in_boot_stage, hart_context_in_trap_stage};
 use crate::syscall::syscallid::SyscallID;
 use alloc::collections::BTreeMap;
 use log::trace;
+use riscv::register::sepc;
 pub struct AppManager {
 	num_app: usize,
 	next_app: Mutex<usize>,
@@ -51,7 +56,7 @@ impl AppManager {
 		self.next_app.lock()
 	}
 
-	pub fn load_app(&self, app_id: usize) {
+	pub fn load_app(&self, app_id: usize) -> Range<*const u8>{
 		use crate::config::APP_BASE_ADDR;
 		if app_id >= self.num_app {
 			info!("All applications completed! Kennel shutdown");
@@ -59,27 +64,35 @@ impl AppManager {
 		}
 		let app_addr_start = *self.app_start_addr.get(app_id).unwrap();
 		let app_addr_end = *self.app_start_addr.get(app_id + 1).unwrap();
+		let app_addr_off = app_addr_start - *self.app_start_addr.get(0).unwrap();
 		let count = app_addr_end - app_addr_start;
-		let dst = APP_BASE_ADDR as *mut u8;
+		let dst = (APP_BASE_ADDR + app_addr_off) as *mut u8;
 		info!("Kernel loading app({app_id})");
 		unsafe {
 			core::ptr::copy_nonoverlapping(app_addr_start as *const u8, dst, count);
 			ARCH.fencei();
+			dst .. dst.add(count)
 		}
 	}
 
 	pub fn run_next_app_in_boot(&self) {
 		let mut next_app = self.next_app();
-		self.load_app(*next_app);
-		hart_context_in_boot_stage().app_info.start(*next_app);
+		let app_range = self.load_app(*next_app);
+		hart_context_in_boot_stage().app_info.start(*next_app, app_range.clone());
 		*next_app += 1;
+		unsafe {
+			sepc::write(app_range.start as usize);
+		}
 	}
 
 	pub fn run_next_app_in_trap(&self) {
 		let mut next_app = self.next_app();
-		self.load_app(*next_app);
-		hart_context_in_trap_stage().app_info.start(*next_app);
+		let app_range = self.load_app(*next_app);
+		hart_context_in_trap_stage().app_info.start(*next_app, app_range.clone());
 		*next_app += 1;
+		unsafe {
+			sepc::write(app_range.start as usize);
+		}
 	}
 }
 
@@ -87,7 +100,8 @@ pub struct AppInfo {
 	pub cur_app: usize,
 	pub syscall_record: BTreeMap<SyscallID, usize>,
 	pub start_time: usize,
-	pub end_time: usize
+	pub end_time: usize,
+	pub app_range: Range<*const u8>
 }
 
 impl AppInfo {
@@ -100,14 +114,16 @@ impl AppInfo {
 			cur_app: 0, 
 			syscall_record: record,
 			start_time: 0,
-			end_time: 0
+			end_time: 0,
+			app_range: null()..null()
 		}
 	}
 
-	pub fn start(&mut self, cur_app: usize) {
+	pub fn start(&mut self, cur_app: usize, app_range: Range<*const u8>) {
 		self.cur_app = cur_app;
 		self.clear_syscall_record();
 		self.start_time = ARCH.time_ns();
+		self.app_range = app_range;
 	}
 
 	pub fn end(&mut self) {
@@ -117,6 +133,8 @@ impl AppInfo {
 
 	pub fn print_app_statistics(&self) {
 		trace!("==== App statistics ====");
+		trace!("Start addr: 0x{:x}", self.app_range.start as usize);
+		trace!("End addr  : 0x{:x}", self.app_range.end as usize);
 		trace!("Start time: {}ns", self.start_time);
 		trace!("End time  : {}ns", self.end_time);
 		trace!("Total time: {}ns", self.end_time - self.start_time);
