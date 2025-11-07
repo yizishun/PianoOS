@@ -1,9 +1,7 @@
-[build]
-target = "riscv64gc-unknown-none-elf"
-rustflags = [
-    "-C", "force-frame-pointers=yes",
-    "-C", "relocation-model=pic",
-]
-
 [term]
 verbose = true
+
+[alias]
+xtask = "run --package xtask --release --"
+kernel = "xtask kernel"
+user = "xtask user"

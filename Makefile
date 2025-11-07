@@ -1,6 +1,6 @@
 # ========= Config =========
 ARCH ?= riscv
-MODE ?= debug
+MODE ?= release
 
 # Kernel entry
 KERNEL_ENTRY_PA ?= 0x80200000
@@ -70,7 +70,7 @@ disasm: build
 	@$(OBJDUMP) -S $(KERNEL_ELF)
 
 .PHONY: run
-run: build
+run:
 	$(QEMU_NAME) $(QEMU_ARGS)
 
 .PHONY: qemu

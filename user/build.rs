@@ -9,12 +9,14 @@ fn main() {
         let _ = match arch.as_ref().unwrap().as_str() {
                 "riscv64gc-unknown-none-elf" => fs::write(ld, RISCV_LINKER_SCRIPT),
                 "loongarch64-unknown-none" => unimplemented!(),
-                _ => panic!(
-                            "
-            Unsupported ARCH triple={}. 
-            Use 'riscv64gc-unknown-none-elf' or 'loongarch64-unknown-none'",
-                            arch.unwrap()
-                ),
+                _ => { println!(
+                                    "
+                    Unsupported ARCH triple={}. 
+                    Use 'riscv64gc-unknown-none-elf' or 'loongarch64-unknown-none'",
+                                    arch.unwrap()
+                        );
+                    fs::write(ld, RISCV_LINKER_SCRIPT)
+                }
         };
         std::fs::write(ld, RISCV_LINKER_SCRIPT).unwrap();
 
