@@ -78,7 +78,7 @@ qemu:
 	$(QEMU_NAME) $(QEMU_ARGS)
 
 .PHONY: gdbserver gdbclient
-gdbserver: build
+gdbserver:
 	$(QEMU_NAME) $(QEMU_ARGS) -s -S
 
 gdbclient:

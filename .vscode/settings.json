@@ -1,7 +1,7 @@
 {
    "rust-analyzer.check.allTargets": false,
    "rust-analyzer.checkOnSave": true,
-   //"rust-analyzer.cargo.target": "riscv64gc-unknown-none-elf",
+   "rust-analyzer.cargo.target": "riscv64gc-unknown-none-elf",
    "editor.tabSize": 8,
    "editor.insertSpaces": false,
    "editor.formatOnSave": false,

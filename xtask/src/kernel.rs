@@ -35,7 +35,7 @@ fn build_kernel(arg: &KernelArg) -> Option<ExitStatus> {
 	info!("Building Kernel");
 
 	let rustflags = 
-		"-C relocation-model=pie -C link-arg=-pie -C force-frame-pointers=yes";
+		"-C relocation-model=pie -C force-frame-pointers=yes";
 
 	let arch: &str = &arg.target.as_deref().unwrap_or(ARCH);
 
@@ -43,7 +43,6 @@ fn build_kernel(arg: &KernelArg) -> Option<ExitStatus> {
 	let status = cargo::Cargo::new("build")
 		.package(KERNEL_PACKAGE_NAME)
 		.target(arch)
-		.unstable("build-std", ["core", "alloc"])
 		.env("RUSTFLAGS", rustflags)
 		.release()
 		.status()
@@ -68,6 +67,7 @@ fn build_kernel(arg: &KernelArg) -> Option<ExitStatus> {
 		.args([
 			"-O",
 			"binary",
+			"--strip-all",
 			"--binary-architecture=riscv64",
 			&elf_path.to_string_lossy(),
 			&bin_path.to_string_lossy(),
