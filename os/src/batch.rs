@@ -13,13 +13,14 @@ use crate::config::MAX_APP_NUM;
 use crate::global::_num_app;
 use crate::harts::{hart_context_in_boot_stage, hart_context_in_trap_stage};
 use crate::syscall::syscallid::SyscallID;
+use crate::elf::ElfInfo;
 use alloc::collections::BTreeMap;
 use log::trace;
 use riscv::register::sepc;
 pub struct AppManager {
 	num_app: usize,
 	next_app: Mutex<usize>,
-	app_start_addr: [usize; MAX_APP_NUM + 1],
+	elf_info: [ElfInfo; MAX_APP_NUM]
 }
 
 impl AppManager {
@@ -31,23 +32,32 @@ impl AppManager {
 			unsafe { core::slice::from_raw_parts(num_app_ptr.add(1), count) };
 		let mut app_start_addr: [usize; MAX_APP_NUM + 1] = [0; MAX_APP_NUM + 1];
 		app_start_addr[..count].copy_from_slice(app_start_addr_raw);
+		let mut elf_info: [ElfInfo; MAX_APP_NUM] = [ElfInfo::ZERO; MAX_APP_NUM];
+		for (elf, i) in elf_info.iter_mut().zip(0..num_app_usize) {
+			elf.start_addr = app_start_addr[i];
+			elf.end_addr = app_start_addr[i + 1];
+		}
 		AppManager { num_app: num_app_usize,
 			     next_app: Mutex::new(0),
-			     app_start_addr: app_start_addr }
+			     elf_info: elf_info }
+	}
+
+	pub fn elf_info(&self, idx: usize) -> &ElfInfo {
+		self.elf_info.get(idx).unwrap()
 	}
 
 	pub fn print_app_info(&self) {
 		info!("Kernel app number: {}", self.num_app);
 		for i in 0..self.num_app {
 			info!("app {i}: [{:<10p}, {:<10p}]",
-			      self.app_start_addr[i] as *const usize,
-			      self.app_start_addr[i + 1] as *const usize);
+			      self.elf_info[i].start_addr as *const usize,
+			      self.elf_info[i].end_addr as *const usize);
 		}
 	}
 
 	pub fn app_size(&self, app_id: usize) -> usize {
 		assert!(app_id < self.num_app, "Invalid app id {}", app_id);
-		let size: isize = (self.app_start_addr[app_id + 1] - self.app_start_addr[app_id]) as isize;
+		let size: isize = (self.elf_info[app_id].end_addr - self.elf_info[app_id].start_addr) as isize;
 		assert!(size >= 0, "app size is nagative");
 		size as usize
 	}
@@ -56,27 +66,17 @@ impl AppManager {
 		self.next_app.lock()
 	}
 
-	pub fn load_app(&self, app_id: usize) -> Range<*const u8>{
-		use crate::config::APP_BASE_ADDR;
+	pub fn load_app_elf(&self, app_id: usize) -> Range<*const u8>{
 		if app_id >= self.num_app {
 			info!("All applications completed! Kennel shutdown"); //TODO:这个打印要是发生在boot time就会出错
 			ARCH.shutdown(false);
 		}
-		let app_addr_start = *self.app_start_addr.get(app_id).unwrap();
-		let app_addr_end = *self.app_start_addr.get(app_id + 1).unwrap();
-		let app_addr_off = app_addr_start - *self.app_start_addr.get(0).unwrap();
-		let count = app_addr_end - app_addr_start;
-		let dst = (APP_BASE_ADDR + app_addr_off) as *mut u8;
-		unsafe {
-			core::ptr::copy_nonoverlapping(app_addr_start as *const u8, dst, count);
-			ARCH.fencei();
-			dst .. dst.add(count)
-		}
+		self.elf_info.get(app_id).unwrap().load_elf()
 	}
 
 	pub fn run_next_app_in_boot(&self) {
 		let mut next_app = self.next_app();
-		let app_range = self.load_app(*next_app);
+		let app_range = self.load_app_elf(*next_app);
 		hart_context_in_boot_stage().app_info.start(*next_app, app_range.clone());
 		*next_app += 1;
 		unsafe {
@@ -86,7 +86,7 @@ impl AppManager {
 
 	pub fn run_next_app_in_trap(&self) {
 		let mut next_app = self.next_app();
-		let app_range = self.load_app(*next_app);
+		let app_range = self.load_app_elf(*next_app);
 		info!("Kernel loading app({})", *next_app);
 		hart_context_in_trap_stage().app_info.start(*next_app, app_range.clone());
 		*next_app += 1;

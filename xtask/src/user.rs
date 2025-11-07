@@ -61,7 +61,7 @@ fn build_User(arg: &UserArg) -> Option<ExitStatus> {
 	let current_dir = env::current_dir().ok()?;
 	let target_dir = get_target_dir(&current_dir, &arch);
 	let user_bin = current_dir.join("user").join("src").join("bin");
-	let target_user_bin = current_dir.join("user").join("binary");
+	let target_user_dir = current_dir.join("user").join("elf");
 	let mut bin_file: Vec<OsString> = fs::read_dir(&user_bin)
 		.unwrap()
 		.filter_map(|entry| entry.ok())
@@ -70,35 +70,29 @@ fn build_User(arg: &UserArg) -> Option<ExitStatus> {
 	let elfs_path: Vec<PathBuf> = bin_file.iter().map(|f| {
 		target_dir.join(f)	
 	}).collect();
-	let bins_path: Vec<PathBuf> = bin_file.iter_mut().map(|f| {
-		let ext = OsString::from(".bin");
-		f.push(ext);
-		target_user_bin.join(f)
+	let dst_elfs_path: Vec<PathBuf> = bin_file.iter_mut().map(|f| {
+		target_user_dir.join(f)
 	}).collect();
 	
 	// Create binary from ELF
-	info!("Converting ELF to binary with rust-objcopy");
-	for (elf_path, bin_path) in elfs_path.iter().zip(bins_path) {
-		info!("{:?} -> {:?}", elf_path, bin_path);
-		let result = Command::new("rust-objcopy")
+	info!("Copy Elf");
+	for (src_path, dst_path) in elfs_path.iter().zip(dst_elfs_path) {
+		info!("{:?} -> {:?}", src_path, dst_path);
+		let result = Command::new("cp")
 			.args([
-				"-O",
-				"binary",
-				"--binary-architecture=riscv64",
-				&elf_path.to_string_lossy(),
-				&bin_path.to_string_lossy(),
+				&OsStr::new(&src_path.to_string_lossy().as_ref()),
+        			&OsStr::new(&dst_path.to_string_lossy().as_ref()),
 			])
 			.status()
 			.ok();
 
 		if result.is_none() {
 			error!(
-				"Failed to execute rust-objcopy. Command not found or failed to start.\n\
+				"Failed to execute cp. Command not found or failed to start.\n\
 				Source: {}\n\
-				Destination: {}\n\
-				Please install cargo-binutils with cmd: cargo install cargo-binutils",
-				elf_path.display(),
-				bin_path.display()
+				Destination: {}",
+				src_path.display(),
+				dst_path.display()
 			);
 		}
 	}

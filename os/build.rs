@@ -57,7 +57,7 @@ fn check_fp() -> bool {
     fp_on
 }
 
-static TARGET_PATH: &str = "../user/binary/";
+static TARGET_PATH: &str = "../user/elf/";
 
 fn insert_app_data() -> String {
         let mut f = String::new();
@@ -102,7 +102,7 @@ _num_app:
     .global app_{0}_start
     .global app_{0}_end
 app_{0}_start:
-    .incbin "{2}{1}.bin"
+    .incbin "{2}{1}"
 app_{0}_end:"#,
                          idx, app, TARGET_PATH
                 ).unwrap();

@@ -33,6 +33,7 @@ mod platform;
 mod trap;
 mod harts;
 mod syscall;
+mod elf;
 
 extern crate alloc;
 
