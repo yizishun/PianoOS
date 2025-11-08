@@ -12,7 +12,6 @@ use crate::error::KernelError;
 use alloc::boxed::Box;
 use log::info;
 use serde_device_tree::buildin::Node;
-use spin::Once;
 use spin::mutex::Mutex;
 
 pub type BaseAddr = usize;

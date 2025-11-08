@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use serde_device_tree::from_raw_mut;
 use core::{ops::Range, ptr::copy_nonoverlapping};
 use elf::{
 	ElfBytes,
@@ -7,7 +6,6 @@ use elf::{
 	endian::AnyEndian,
 	segment::ProgramHeader
 };
-use crate::println;
 
 use crate::{arch::common::ArchMem, global::{APP_MANAGER, ARCH}};
 

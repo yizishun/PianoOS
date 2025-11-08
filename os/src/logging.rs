@@ -86,10 +86,13 @@ impl Log for TrapLogger {
 		};
 		let ansi_reset = "\x1b[0m";
 		let bold = "\x1b[1;37m";
-		let hart_id = hart_context_in_trap_stage().hartid();
-		println!("{bold}[kernel]{reset}{color_log} {:<5}[{:>2}]{reset} - {}",
+		let hart_context = hart_context_in_trap_stage();
+		let hart_id = hart_context.hartid();
+		let app_id = hart_context.app_info.cur_app;
+		println!("{bold}[kernel]{reset}{color_log} {:<5}[{:>2}][{:>2}]{reset} - {}",
 			 record.level(),
 			 hart_id,
+			 app_id,
 			 record.args(),
 			 reset = ansi_reset,
 			 color_log = ansi_color,

@@ -4,10 +4,10 @@
 #![feature(core_intrinsics)]
 
 use core::arch::asm;
-use core::intrinsics::unreachable;
 
 use log::info;
 
+use crate::arch::common::ArchPower;
 use crate::arch::common::ArchTrap;
 use crate::arch::common::boot_entry;
 use crate::arch::common::boot_handler;
@@ -66,22 +66,26 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	APP_MANAGER.get().unwrap().print_app_info();
 
 	// 6. boot hart start other harts
-	//  switch logger
-	PIANOLOGGER.get().unwrap().set_trap_logger();
-	for i in 0..HartContext::get_hartnum() {
-		let start_addr = arch::common::entry::hart_start as usize;
-		sbi_rt::hart_start(i, start_addr, 0);
-	}
+	if APP_MANAGER.get().unwrap().num_app != 0 {
+		//  switch logger
+		PIANOLOGGER.get().unwrap().set_trap_logger();
+		for i in 0..HartContext::get_hartnum() {
+			let start_addr = arch::common::entry::hart_start as usize;
+			sbi_rt::hart_start(i, start_addr, 0);
+		}
 
-	// 7. boot app
-	APP_MANAGER
-		.get()
-		.unwrap()
-		.run_next_app_in_boot();
-	unsafe {
-		boot_handler();
-		asm!("mv a0, {0}", in(reg) hartid, options(nomem));
-		boot_entry();
+		// 7. boot app
+		APP_MANAGER
+			.get()
+			.unwrap()
+			.run_next_app_in_boot();
+		unsafe {
+			boot_handler();
+			asm!("mv a0, {0}", in(reg) hartid, options(nomem));
+			boot_entry();
+		}
+	} else {
+		ARCH.shutdown(false);
 	}
 
 	unreachable!();

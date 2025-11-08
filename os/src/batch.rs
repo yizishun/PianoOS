@@ -1,12 +1,13 @@
 use core::ops::Range;
 use core::ptr::null;
+use core::sync::atomic::{AtomicBool, Ordering};
+use core::array;
 
 use log::info;
-use riscv::register::mstatus::set_fs;
 use spin::{Mutex, MutexGuard};
 use strum::IntoEnumIterator;
 
-use crate::arch::common::{ArchMem, ArchTime};
+use crate::arch::common::ArchTime;
 use crate::global::{APP_MANAGER, ARCH};
 use crate::arch::common::ArchPower;
 use crate::config::MAX_APP_NUM;
@@ -18,8 +19,9 @@ use alloc::collections::BTreeMap;
 use log::trace;
 use riscv::register::sepc;
 pub struct AppManager {
-	num_app: usize,
+	pub num_app: usize,
 	next_app: Mutex<usize>,
+	finished: [AtomicBool; MAX_APP_NUM],
 	elf_info: [ElfInfo; MAX_APP_NUM]
 }
 
@@ -37,9 +39,13 @@ impl AppManager {
 			elf.start_addr = app_start_addr[i];
 			elf.end_addr = app_start_addr[i + 1];
 		}
+		let finished: [AtomicBool; MAX_APP_NUM] =
+       			array::from_fn(|_| AtomicBool::new(false));
 		AppManager { num_app: num_app_usize,
 			     next_app: Mutex::new(0),
-			     elf_info: elf_info }
+			     finished,
+			     elf_info
+			}
 	}
 
 	pub fn elf_info(&self, idx: usize) -> &ElfInfo {
@@ -68,8 +74,20 @@ impl AppManager {
 
 	pub fn load_app_elf(&self, app_id: usize) -> Range<*const u8>{
 		if app_id >= self.num_app {
-			info!("All applications completed! Kennel shutdown"); //TODO:这个打印要是发生在boot time就会出错
-			ARCH.shutdown(false);
+			loop {
+			    	let all_finished = 
+			    		self.finished.iter().take(self.num_app)
+						.all(|f| f.load(Ordering::Acquire));
+				if all_finished {
+					info!("All applications completed! Kennel shutdown");
+					ARCH.shutdown(false);
+				} else {
+					//info!("Waiting other program finished");
+					//self.finished.iter().take(self.num_app).enumerate().for_each(|e| {
+						//info!("program({:?}) finished: {:?}", e.0, e.1);
+					//});
+				}
+			}
 		}
 		self.elf_info.get(app_id).unwrap().load_elf()
 	}
@@ -93,6 +111,11 @@ impl AppManager {
 		unsafe {
 			sepc::write(app_range.start as usize);
 		}
+	}
+
+	pub fn set_finish(&self, app_id: usize) {
+		self.finished.get(app_id).unwrap()
+			.store(true, Ordering::Release);
 	}
 }
 
@@ -129,10 +152,11 @@ impl AppInfo {
 	pub fn end(&mut self) {
 		self.end_time = ARCH.time_ns();
 		self.print_app_statistics();
+		APP_MANAGER.get().unwrap().set_finish(self.cur_app);
 	}
 
 	pub fn print_app_statistics(&self) {
-		trace!("==== App statistics ====");
+		trace!("==== App({}) statistics ====", self.cur_app);
 		trace!("Start addr: 0x{:x}", self.app_range.start as usize);
 		trace!("End addr  : 0x{:x}", self.app_range.end as usize);
 		trace!("Start time: {}ns", self.start_time);
@@ -140,7 +164,7 @@ impl AppInfo {
 		trace!("Total time: {}ns", self.end_time - self.start_time);
 		trace!("Syscall statistics --");
 		self.print_syscall_record();
-		trace!("== App statistics end ==");
+		trace!("== App({}) statistics end ==", self.cur_app);
 	}
 
 	pub fn print_syscall_record(&self) {
