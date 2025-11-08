@@ -1,6 +1,6 @@
 # ========= Config =========
 ARCH ?= riscv
-MODE ?= release
+MODE ?= debug
 
 # Kernel entry
 KERNEL_ENTRY_PA ?= 0x80200000

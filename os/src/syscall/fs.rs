@@ -2,7 +2,7 @@ use core::{slice::from_raw_parts, str::from_utf8};
 
 use log::warn;
 
-use crate::{global::{APP_MANAGER, USER_STACK}, harts::hart_context_in_trap_stage, print};
+use crate::{global::{TASK_MANAGER, USER_STACK}, harts::hart_context_in_trap_stage, print};
 
 const FD_STDOUT: usize = 1;
 
@@ -27,7 +27,7 @@ fn check_buf_valid(buf: *const u8, len: usize) -> bool {
 	let hart_context = hart_context_in_trap_stage();
 	let harid = hart_context.hartid();
 	let cur_app = hart_context.app_info.cur_app;
-	let app_size = APP_MANAGER.get().unwrap().app_size(cur_app);
+	let app_size = TASK_MANAGER.get().unwrap().app_size(cur_app);
 
 	let app_range = &hart_context.app_info.app_range;
 	let app_stack_range = unsafe { USER_STACK[harid].as_ptr_range() };

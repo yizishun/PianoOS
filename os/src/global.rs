@@ -1,5 +1,6 @@
-use crate::batch::AppManager;
-use crate::config::NUM_HART_MAX;
+use crate::task::TaskManager;
+use crate::config::{MAX_APP_NUM, NUM_HART_MAX};
+use crate::loader::{ElfInfo, LoaderElfInfo};
 use crate::mm::stack::{KernelStack, UserStack};
 use crate::platform::Platform;
 use crate::arch::common::Arch;
@@ -28,7 +29,9 @@ unsafe extern "C" {
 
 pub static PLATFORM: Once<Platform> = Once::new();
 
-pub static APP_MANAGER: Once<AppManager> = Once::new();
+pub static TASK_MANAGER: Once<TaskManager> = Once::new();
+
+pub static LOADER_ELF_INFO: Once<LoaderElfInfo> = Once::new();
 
 #[unsafe(link_section = ".bss.kstack")]
 pub static mut KERNEL_STACK: [KernelStack; NUM_HART_MAX] = [KernelStack::ZERO; NUM_HART_MAX];

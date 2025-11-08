@@ -10,7 +10,10 @@ use std::env;
 #[derive(Debug, Args, Clone)]
 pub struct KernelArg {
     	#[arg(short, long, default_value = "riscv64gc-unknown-none-elf")]
-	pub target: String
+	pub target: String,
+
+	#[arg(long, default_value_t = false)]
+    	pub release: bool,
 }
 
 #[must_use]
@@ -26,8 +29,9 @@ pub fn run(arg: &KernelArg) -> Option<ExitStatus> {
 	Some(exit_status)
 }
 
-fn get_target_dir(current_dir: &Path, arch: &str) -> PathBuf {
-    	current_dir.join("target").join(arch).join("release")
+fn get_target_dir(current_dir: &Path, arch: &str, release: bool) -> PathBuf {
+    let build_type = if release { "release" } else { "debug" };
+    current_dir.join("target").join(arch).join(build_type)
 }
 
 fn build_kernel(arg: &KernelArg) -> Option<ExitStatus> {
@@ -37,13 +41,14 @@ fn build_kernel(arg: &KernelArg) -> Option<ExitStatus> {
 		"-C relocation-model=pie -C force-frame-pointers=yes";
 
 	let arch: &str = &arg.target;
+	let release = arg.release;
 
 	// Build the prototyper
 	let status = cargo::Cargo::new("build")
 		.package(KERNEL_PACKAGE_NAME)
 		.target(arch)
 		.env("RUSTFLAGS", rustflags)
-		.release()
+		.release(release)
 		.status()
 		.ok()?;
 
@@ -56,7 +61,7 @@ fn build_kernel(arg: &KernelArg) -> Option<ExitStatus> {
 
     	// Get target directory once instead of recreating it
 	let current_dir = env::current_dir().ok()?;
-	let target_dir = get_target_dir(&current_dir, &arch);
+	let target_dir = get_target_dir(&current_dir, &arch, release);
 	let elf_path = target_dir.join(KERNEL_PACKAGE_NAME);
 	let bin_path = target_dir.join(format!("{}.bin", KERNEL_PACKAGE_NAME));
 

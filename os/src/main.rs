@@ -12,14 +12,15 @@ use crate::arch::common::ArchTrap;
 use crate::arch::common::boot_entry;
 use crate::arch::common::boot_handler;
 use crate::global::*;
+use crate::loader::LoaderElfInfo;
 use crate::logging::PIANOLOGGER;
 use crate::logging::PianoLogger;
 use crate::{
-	harts::HartContext, batch::AppManager, mm::heap::heap_init, platform::Platform,
+	harts::HartContext, task::TaskManager, mm::heap::heap_init, platform::Platform,
 };
 
 mod arch;
-mod batch;
+mod task;
 mod config;
 mod console;
 mod devicetree;
@@ -33,7 +34,7 @@ mod platform;
 mod trap;
 mod harts;
 mod syscall;
-mod elf;
+mod loader;
 
 extern crate alloc;
 
@@ -42,7 +43,7 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	// 1. clear bss, heap init and hart info init
 	clear_bss();
 	heap_init();
-	APP_MANAGER.call_once(|| AppManager::new());
+	LOADER_ELF_INFO.call_once(|| LoaderElfInfo::new());
 
 	// 2. parse device tree and init platform
 	PLATFORM.call_once(|| Platform::init_platform(device_tree).unwrap());
@@ -63,10 +64,12 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 
 	// 5. print some kernel info and app info
 	print_kernel_mem();
-	APP_MANAGER.get().unwrap().print_app_info();
+	LOADER_ELF_INFO.get().unwrap().print_app_info();
 
 	// 6. boot hart start other harts
-	if APP_MANAGER.get().unwrap().num_app != 0 {
+	// elf load happen in this func
+	TASK_MANAGER.call_once(|| TaskManager::new());
+	if TASK_MANAGER.get().unwrap().num_app != 0 {
 		//  switch logger
 		PIANOLOGGER.get().unwrap().set_trap_logger();
 		for i in 0..HartContext::get_hartnum() {
@@ -75,7 +78,7 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 		}
 
 		// 7. boot app
-		APP_MANAGER
+		TASK_MANAGER
 			.get()
 			.unwrap()
 			.run_next_app_in_boot();
@@ -98,7 +101,7 @@ extern "C" fn hart_main(hartid: usize, _opaque: usize) -> ! {
 		KERNEL_STACK[hartid].load_as_stack(hartid); //init HartContext and TrapHandler
 	}
 
-	APP_MANAGER
+	TASK_MANAGER
 		.get()
 		.unwrap()
 		.run_next_app_in_boot();

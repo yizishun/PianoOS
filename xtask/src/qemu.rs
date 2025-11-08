@@ -11,6 +11,9 @@ pub struct QemuArg {
 	#[arg(short, long, default_value = "riscv64gc-unknown-none-elf")]
 	pub target: String,
 
+	#[arg(long, default_value_t = false)]
+    	pub release: bool,
+
 	#[arg(long, default_value_t = 8)]
 	pub smp: usize,
 
@@ -33,13 +36,14 @@ pub struct QemuArg {
 #[must_use]
 pub fn run(arg: &QemuArg) -> Option<ExitStatus> {
 	let arch = &arg.target;
+	let release = arg.release;
 	let qemu_bin = arg
 		.qemu
 		.clone()
 		.unwrap_or_else(|| guess_qemu_system(arch).to_string());
 
 	let current_dir = env::current_dir().ok()?;
-	let target_dir = get_target_dir(&current_dir, arch);
+	let target_dir = get_target_dir(&current_dir, arch, release);
 
 	let bin_path = target_dir.join(format!("{}.bin", KERNEL_PACKAGE_NAME));
 	if !bin_path.exists() {
@@ -97,8 +101,9 @@ pub fn run(arg: &QemuArg) -> Option<ExitStatus> {
 	}
 }
 
-fn get_target_dir(current_dir: &Path, arch: &str) -> PathBuf {
-    	current_dir.join("target").join(arch).join("release")
+fn get_target_dir(current_dir: &Path, arch: &str, release: bool) -> PathBuf {
+    let build_type = if release { "release" } else { "debug" };
+    current_dir.join("target").join(arch).join(build_type)
 }
 
 fn parse_int_or_hex(s: &str) -> Option<u64> {

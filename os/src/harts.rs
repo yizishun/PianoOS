@@ -8,20 +8,20 @@ use core::arch::asm;
 //
 // HartContext will always at the end of Stack, so we should make sure
 // STACK_SIZE_PER_HART is a multiple of b.
-use crate::{arch::common::{ArchHarts, FlowContext}, batch::AppInfo, config::KERNEL_STACK_SIZE, global::ARCH, trap::TrapHandler};
+use crate::{arch::common::{ArchHarts, FlowContext}, task::harts::AppHartInfo, config::KERNEL_STACK_SIZE, global::ARCH, trap::TrapHandler};
 const _: () = assert!(KERNEL_STACK_SIZE % core::mem::align_of::<HartContext>() == 0);
 
 #[repr(C, align(128))]
 pub struct HartContext {
 	flow_context: crate::arch::common::FlowContext,
 	hartid: usize,
-	pub app_info: AppInfo
+	pub app_info: AppHartInfo
 }
 
 impl HartContext {
 	pub fn init(&mut self, hartid: usize){
 		self.hartid = hartid;
-		self.app_info = AppInfo::new();
+		self.app_info = AppHartInfo::new();
 	}
 
 	pub fn get_hartnum() -> usize {

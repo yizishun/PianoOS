@@ -45,7 +45,7 @@ fn build_user(arg: &UserArg) -> Option<ExitStatus> {
 		.target(arch)
 		.unstable("build-std", ["core", "alloc"])
 		.env("RUSTFLAGS", rustflags)
-		.release()
+		.release(true)
 		.status()
 		.ok()?;
 

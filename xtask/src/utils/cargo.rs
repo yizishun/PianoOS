@@ -29,8 +29,10 @@ impl Cargo {
 		self
 	}
 
-	pub fn release(&mut self) -> &mut Self {
-		self.arg("--release");
+	pub fn release(&mut self, release: bool) -> &mut Self {
+		if (release) {
+			self.arg("--release");
+		}
 		self
 	}
 

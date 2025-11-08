@@ -6,7 +6,7 @@ use riscv::register::{scause, stval};
 use riscv::register::mcause::Trap;
 
 use crate::{arch::{common::ArchTrap, riscv::Riscv64}, harts::hart_context_in_trap_stage};
-use crate::APP_MANAGER;
+use crate::TASK_MANAGER;
 use crate::syscall::syscall;
 use crate::trap::fast::FastResult;
 use crate::trap::fast::FastContext;
@@ -232,7 +232,7 @@ pub extern "C" fn fast_handler(
 		warn!("PageFault in application, kernel killed it.");
 		warn!("Illegal addr: 0x{:x}", stval);
 		warn!("excption pc: 0x{:x}", sepc::read());
-		APP_MANAGER.get().unwrap().run_next_app_in_trap();
+		TASK_MANAGER.get().unwrap().run_next_app_in_trap();
 		ctx.restore()
 	}
 	Trap::Exception(Exception::IllegalInstruction) => {
@@ -240,7 +240,7 @@ pub extern "C" fn fast_handler(
 		ctx.hart().app_info.end();
 		warn!("IllegalInstruction in application, kernel killed it.");
 		warn!("excption pc: 0x{:x}", sepc::read());
-		APP_MANAGER.get().unwrap().run_next_app_in_trap();
+		TASK_MANAGER.get().unwrap().run_next_app_in_trap();
 		ctx.restore()
 	}
 	Trap::Exception(Exception::InstructionFault) |
@@ -251,7 +251,7 @@ pub extern "C" fn fast_handler(
 		warn!("Instruction PageFault in application, kernel killed it.");
 		warn!("Illegal addr: 0x{:x}", stval);
 		warn!("excption pc: 0x{:x}", sepc::read());
-		APP_MANAGER.get().unwrap().run_next_app_in_trap();
+		TASK_MANAGER.get().unwrap().run_next_app_in_trap();
 		ctx.restore()
 	}
 
