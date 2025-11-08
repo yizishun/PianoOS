@@ -525,7 +525,7 @@ emm，打算抄袭一下rustsbi中解析设备树的实现（等我实现完我�
 
 所以最关键的目的是获得custom的一个fip.bin文件
 
-首先clone这个v2的sdk repo，cd进入，然后
+首先clone这个v2(不是v2，这个是错误的，请不要跟着来)的sdk repo，cd进入，然后
 
 ```shell
 > source ./device/milkv-duo256m-musl-riscv64-sd/boardconfig.sh 
@@ -597,7 +597,7 @@ docker run --rm --platform=linux/amd64 debian:stable-slim uname -m
 docker pull --platform=linux/riscv64 debian:stable-slim
 docker run --rm --platform=linux/riscv64 debian:stable-slim uname -m
 
-sudo docker run -it --name duodocker \                                                                                  
+sudo docker run -it --name duodocker \          
   --platform=linux/amd64 \
   -v "$(pwd)":/home/work \
   guttatus314/milkv-duo:rust /bin/bash
@@ -651,74 +651,22 @@ index 9a352403d..544fb5ea3 100644
 
 然后运行
 
-```shell
-./plat/cv181x/fiptool.py -v genfip \
-        '/home/work/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/fip.bin' \
-        --MONITOR_RUNADDR="0x0000000080000000" \
-        --CHIP_CONF='/home/work/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/chip_conf.bin' \
-        --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' \
-        --NAND_INFO='00000000'\
-        --BL2='/home/work/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/bl2.bin' \
-        --MONITOR='../rustsbi-prototyper-payload.bin' \
-        --LOADER_2ND='../PianoOS.bin' \
-```
-
 我的PiannoOS不符合bl33格式，所以我直接删掉了这一行，毕竟我这个payload rustsbi本身就要有把我的os加载的功能，然后成功生成fip.bin
 
 ```shell
-./plat/cv181x/fiptool.py -v genfip \
-        '/home/work/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/fip.bin' \
-        --MONITOR_RUNADDR="0x80000000" \
-        --CHIP_CONF='/home/work/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/chip_conf.bin' \
-        --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' \
-        --NAND_INFO='00000000'\
-        --BL2='/home/work/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/bl2.bin' \
-        --MONITOR='../opensbi/build/platform/generic/firmware/fw_dynamic.bin' \
-        --LOADER_2ND='/home/work/u-boot-2021.10/build/sg2002_milkv_duo256m_musl_riscv64_sd/u-boot-raw.bin' \
-        --compress='lzma'
-```
-
-```shell
-./plat/cv180x/fiptool.py -v genfip \
-    'build/sg2002_milkv_duo256m_musl_riscv64_sd/fip.bin' \
-    --MONITOR_RUNADDR="0x0" \
-    --CHIP_CONF='build/sg2002_milkv_duo256m_musl_riscv64_sd/chip_conf.bin' \
-    --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' \
-    --NAND_INFO='00000000'\
-    --BL2='build/sg2002_milkv_duo256m_musl_riscv64_sd/bl2.bin' \
-    --LOADER_2ND='./bl33.bin'
-```
-
-```shell
-> sudo ./plat/cv181x/fiptool.py -v genfip \
-        '/home/yzs/rcore/duo-buildroot-sdk-v2/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/fip.bin' \
-        --MONITOR_RUNADDR="0x0000000080000000" \
-        --CHIP_CONF='/home/yzs/rcore/duo-buildroot-sdk-v2/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/chip_conf.bin' \
-        --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' \
-        --NAND_INFO='00000000'\
-        --BL2='/home/yzs/rcore/duo-buildroot-sdk-v2/fsbl/build/sg2002_milkv_duo256m_musl_riscv64_sd/bl2.bin' \
-        --MONITOR='../rustsbi-prototyper-payload.bin'
-```
-
-```shell
-. /home/work/fsbl/build/cv1812cp_milkv_duo256m_sd/blmacros.env && \
-./plat/cv181x/fiptool.py -v genfip \
-        './build/cv1812cp_milkv_duo256m_sd/fip.bin' \
-        --MONITOR_RUNADDR="0x80000000" \
-        --CHIP_CONF='./build/cv1812cp_milkv_duo256m_sd/chip_conf.bin' \
-        --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' \
-        --NAND_INFO='00000000'\
-        --BL2='./build/cv1812cp_milkv_duo256m_sd/bl2.bin' \
-        --BLCP_IMG_RUNADDR=0x05200200 \
-        --BLCP_PARAM_LOADADDR=0 \
-        --BLCP=test/empty.bin \
-        --DDR_PARAM='test/cv181x/ddr_param.bin' \
-        --MONITOR='../rustsbi/target/riscv64gc-unknown-none-elf/release/rustsbi-prototyper-dynamic.bin' \
-        --LOADER_2ND='../u-boot-2021.10/build/cv1812cp_milkv_duo256m_sd/u-boot-raw.bin' \
-        --compress='lzma'
-
-
-./plat/cv181x/fiptool.py -v genfip         './build/cv1812cp_milkv_duo256m_sd/fip.bin'         --MONITOR_RUNADDR="0x80000000"         --CHIP_CONF='./build/cv1812cp_milkv_duo256m_sd/chip_conf.bin'         --NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF'         --NAND_INFO='00000000'        --BL2='./build/cv1812cp_milkv_duo256m_sd/bl2.bin'         --BLCP_IMG_RUNADDR=0x05200200         --BLCP_PARAM_LOADADDR=0         --BLCP=test/empty.bin         --DDR_PARAM='test/cv181x/ddr_param.bin'         --MONITOR='../rustsbi/target/riscv64gc-unknown-none-elf/release/rustsbi-prototyper-dynamic.bin'         --LOADER_2ND='../PianoOS.bin'         --compress='lzma'
+./plat/cv181x/fiptool.py -v genfip         
+	'./build/cv1812cp_milkv_duo256m_sd/fip.bin'         
+	--MONITOR_RUNADDR="0x80000000"         
+	--CHIP_CONF='./build/cv1812cp_milkv_duo256m_sd/chip_conf.bin'         
+	--NOR_INFO='FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF'         	--NAND_INFO='00000000'        
+	--BL2='./build/cv1812cp_milkv_duo256m_sd/bl2.bin'         
+	--BLCP_IMG_RUNADDR=0x05200200         
+	--BLCP_PARAM_LOADADDR=0         
+	--BLCP=test/empty.bin         
+	--DDR_PARAM='test/cv181x/ddr_param.bin'         
+	--MONITOR='../rustsbi/target/riscv64gc-unknown-none-elf/release/rustsbi-prototyper-dynamic.bin'         
+	--LOADER_2ND='../PianoOS.bin'         
+	--compress='lzma'
 
 ./plat/cv181x/fiptool.py -v genfip \
         '/home/work/fsbl/build/cv1812cp_milkv_duo256m_sd/fip.bin' \
