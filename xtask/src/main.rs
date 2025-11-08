@@ -4,15 +4,18 @@ use std::process::{ExitCode, ExitStatus};
 
 use crate::kernel::KernelArg;
 use crate::user::UserArg;
+use crate::qemu::QemuArg;
+use crate::all::AllArg;
 
 mod utils;
 mod kernel;
 mod user;
+mod qemu;
+mod all;
 mod logger;
 
 const KERNEL_PACKAGE_NAME: &str = "PianoOS";
 const USER_PACKAGE_NAME: &str = "user_lib";
-const ARCH: &str = "riscv64gc-unknown-none-elf";
 
 #[derive(Parser)]
 #[command(
@@ -34,6 +37,10 @@ enum Cmd {
 	Kernel(KernelArg),
 	/// Build test-kernel for the RustSBI Prototyper.
 	User(UserArg),
+	/// Run Kernel using Qemu
+	Qemu(QemuArg),
+	/// Run all above
+	All(AllArg),
 }
 
 fn main() -> ExitCode {
@@ -45,7 +52,9 @@ fn main() -> ExitCode {
 
 	let result = match &cli_args.cmd {
 		Cmd::Kernel(arg) => kernel::run(arg),
-		Cmd::User(arg) => user::run(arg)
+		Cmd::User(arg) => user::run(arg),
+		Cmd::Qemu(arg) => qemu::run(arg),
+		Cmd::All(arg) => all::run(arg),
 	};
 
 	ExitCode::SUCCESS

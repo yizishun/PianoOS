@@ -5,3 +5,5 @@ verbose = true
 xtask = "run --package xtask --release --"
 kernel = "xtask kernel"
 user = "xtask user"
+qemu = "xtask qemu"
+all = "xtask all"

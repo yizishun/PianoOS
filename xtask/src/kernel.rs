@@ -1,7 +1,6 @@
 use clap::Args;
 use crate::utils::{CmdOptional, cargo};
 use crate::KERNEL_PACKAGE_NAME;
-use crate::ARCH;
 use std::process::ExitStatus;
 use log::{error, info};
 use std::path::{Path, PathBuf};
@@ -10,8 +9,8 @@ use std::env;
 
 #[derive(Debug, Args, Clone)]
 pub struct KernelArg {
-	#[arg(short, long)]
-	pub target: Option<String>
+    	#[arg(short, long, default_value = "riscv64gc-unknown-none-elf")]
+	pub target: String
 }
 
 #[must_use]
@@ -37,7 +36,7 @@ fn build_kernel(arg: &KernelArg) -> Option<ExitStatus> {
 	let rustflags = 
 		"-C relocation-model=pie -C force-frame-pointers=yes";
 
-	let arch: &str = &arg.target.as_deref().unwrap_or(ARCH);
+	let arch: &str = &arg.target;
 
 	// Build the prototyper
 	let status = cargo::Cargo::new("build")
@@ -68,7 +67,6 @@ fn build_kernel(arg: &KernelArg) -> Option<ExitStatus> {
 			"-O",
 			"binary",
 			"--strip-all",
-			"--binary-architecture=riscv64",
 			&elf_path.to_string_lossy(),
 			&bin_path.to_string_lossy(),
 		])

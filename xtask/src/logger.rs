@@ -41,7 +41,7 @@ impl log::Log for Logger {
 		};
 
 		eprintln!(
-		"\x1b[1;37m[RustSBI-xtask] \x1b[1;{color_code}m{:^5}\x1b[0m - {}",
+		"\x1b[1;37m[PianoOS-xtask] \x1b[1;{color_code}m{:^5}\x1b[0m - {}",
 		record.level(),
 		record.args(),
 		);

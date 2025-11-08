@@ -1,7 +1,6 @@
 use clap::Args;
 use crate::utils::{CmdOptional, cargo};
 use crate::USER_PACKAGE_NAME;
-use crate::ARCH;
 use std::ffi::{OsStr, OsString};
 use std::process::ExitStatus;
 use log::{error, info};
@@ -11,13 +10,13 @@ use std::{env, fs};
 
 #[derive(Debug, Args, Clone)]
 pub struct UserArg {
-	#[arg(short, long)]
-	pub target: Option<String>
+    	#[arg(short, long, default_value = "riscv64gc-unknown-none-elf")]
+	pub target: String
 }
 
 #[must_use]
 pub fn run(arg: &UserArg) -> Option<ExitStatus> {
-	let exit_status = build_User(arg)?;
+	let exit_status = build_user(arg)?;
 	if !exit_status.success() {
 		error!(
 			"Failed to execute rust-objcopy. Please ensure that cargo-binutils is installed and available in your system's PATH."
@@ -32,13 +31,13 @@ fn get_target_dir(current_dir: &Path, arch: &str) -> PathBuf {
     	current_dir.join("target").join(arch).join("release")
 }
 
-fn build_User(arg: &UserArg) -> Option<ExitStatus> {
+fn build_user(arg: &UserArg) -> Option<ExitStatus> {
 	info!("Building User");
 
 	let rustflags = 
 		"-C relocation-model=pie -C link-arg=-pie -C force-frame-pointers=yes";
 
-	let arch: &str = &arg.target.as_deref().unwrap_or(ARCH);
+	let arch: &str = &arg.target;
 
 	// Build the prototyper
 	let status = cargo::Cargo::new("build")
