@@ -54,6 +54,10 @@ impl FreeTrapStack {
 	}
     }
 
+    pub fn kstack_ptr(self) -> usize {
+	self.0.as_ptr() as usize
+    }
+
     /// 将这个陷入栈加载为预备陷入栈。
     #[inline]
     pub fn load(self) -> LoadedTrapStack {

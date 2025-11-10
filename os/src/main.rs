@@ -1,7 +1,9 @@
 #![no_std]
 #![no_main]
+#![allow(named_asm_labels)]
 #![feature(ptr_mask)]
 #![feature(core_intrinsics)]
+#![feature(generic_atomic)]
 
 use core::arch::asm;
 
@@ -12,7 +14,7 @@ use crate::arch::common::ArchTrap;
 use crate::arch::common::boot_entry;
 use crate::arch::common::boot_handler;
 use crate::global::*;
-use crate::loader::LoaderElfInfo;
+use crate::loader::Loader;
 use crate::logging::PIANOLOGGER;
 use crate::logging::PianoLogger;
 use crate::{
@@ -43,14 +45,13 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	// 1. clear bss, heap init and hart info init
 	clear_bss();
 	heap_init();
-	LOADER_ELF_INFO.call_once(|| LoaderElfInfo::new());
+	LOADER.call_once(|| Loader::new());
 
 	// 2. parse device tree and init platform
 	PLATFORM.call_once(|| Platform::init_platform(device_tree).unwrap());
 
 	// 3. prepare for trap
 	unsafe {
-		ARCH.load_direct_trap_entry(); // set stvec
 		KERNEL_STACK[hartid].load_as_stack(hartid); //init HartContext and TrapHandler
 	};
 
@@ -64,7 +65,7 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 
 	// 5. print some kernel info and app info
 	print_kernel_mem();
-	LOADER_ELF_INFO.get().unwrap().print_app_info();
+	LOADER.get().unwrap().print_app_info();
 
 	// 6. boot hart start other harts
 	// elf load happen in this func
@@ -81,13 +82,9 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 		TASK_MANAGER
 			.get()
 			.unwrap()
-			.run_next_app_in_boot();
-		unsafe {
-			boot_handler();
-			asm!("mv a0, {0}", in(reg) hartid, options(nomem));
-			boot_entry();
-		}
+			.run_next_at_boot()
 	} else {
+		info!("No app should be run, kernel shutdown");
 		ARCH.shutdown(false);
 	}
 
@@ -97,19 +94,13 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 #[unsafe(no_mangle)]
 extern "C" fn hart_main(hartid: usize, _opaque: usize) -> ! {
 	unsafe {
-		ARCH.load_direct_trap_entry(); // set stvec
 		KERNEL_STACK[hartid].load_as_stack(hartid); //init HartContext and TrapHandler
 	}
 
 	TASK_MANAGER
 		.get()
 		.unwrap()
-		.run_next_app_in_boot();
-	unsafe {
-		boot_handler();
-		asm!("mv a0, {0}", in(reg) hartid, options(nomem));
-		boot_entry();
-	}
+		.run_next_at_boot();
 
 	unreachable!();
 }

@@ -16,6 +16,10 @@ pub use crate::arch::riscv::trap::boot_handler;
 #[cfg(target_arch = "riscv64")]
 pub use crate::arch::riscv::trap::fast_handler;
 
+// switch context
+#[cfg(target_arch = "riscv64")]
+pub use crate::arch::riscv::trap::switch;
+
 // some common behavior
 pub trait ArchMem {
 	unsafe fn fencei(&self);
@@ -38,6 +42,8 @@ pub trait ArchHarts {
 
 pub trait ArchTrap {
 	unsafe fn load_direct_trap_entry(&self);
+	unsafe fn set_next_pc(&self, addr: usize);
+	unsafe fn set_next_user_stack(&self, addr: usize);
 }
 
 #[cfg(target_arch = "riscv64")]

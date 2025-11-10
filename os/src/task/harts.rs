@@ -40,7 +40,6 @@ impl AppHartInfo {
 	pub fn end(&mut self) {
 		self.end_time = ARCH.time_ns();
 		self.print_app_statistics();
-		TASK_MANAGER.get().unwrap().set_finish(self.cur_app);
 	}
 
 	pub fn print_app_statistics(&self) {

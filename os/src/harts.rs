@@ -38,6 +38,10 @@ impl HartContext {
 		}
 	}
 
+	pub fn set_hartid(&mut self, hartid: usize) {
+		self.hartid = hartid;
+	}
+
 }
 
 pub fn hart_context_in_boot_stage() -> &'static mut HartContext {

@@ -105,6 +105,22 @@ impl KernelStack {
 		unsafe { & *self.0.as_mut_ptr().cast() }
     	}
 
+	pub fn init_trap_stack(&'static mut self, hartid: usize) -> FreeTrapStack{
+		let hart_context = self.hart_context_mut();
+		let context_ptr = hart_context.context_ptr();
+		let hart_ptr = unsafe { NonNull::new_unchecked(hart_context) };
+		hart_context.init(hartid);
+
+		let range = self.0.as_ptr_range();
+		FreeTrapStack::new(
+			range.start as usize.. range.end as usize, 
+			|_| {}, 
+			context_ptr,
+			hart_ptr,
+			fast_handler
+		).unwrap()
+	}
+
 	/// Initializes stack for trap handling.
     	/// - Sets up hart context.
     	/// - Creates and loads FreeTrapStack with the stack range.

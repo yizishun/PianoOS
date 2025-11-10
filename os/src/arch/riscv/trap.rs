@@ -1,11 +1,11 @@
-use core::arch::naked_asm;
-use riscv::register::{sepc, sstatus::{self, SPP, Sstatus}, stvec::{self, Stvec}};
+use core::{arch::naked_asm, usize};
+use riscv::register::{sepc, sscratch, sstatus::{self, SPP, Sstatus}, stvec::{self, Stvec}};
 use log::warn;
 use riscv::interrupt::supervisor::Exception;
 use riscv::register::{scause, stval};
 use riscv::register::mcause::Trap;
 
-use crate::{arch::{common::ArchTrap, riscv::Riscv64}, harts::hart_context_in_trap_stage};
+use crate::{arch::{common::ArchTrap, riscv::Riscv64}, harts::hart_context_in_trap_stage, task::context::TaskContext};
 use crate::TASK_MANAGER;
 use crate::syscall::syscall;
 use crate::trap::fast::FastResult;
@@ -16,6 +16,20 @@ impl<C> ArchTrap for Riscv64<C> {
 	unsafe fn load_direct_trap_entry(&self) {
 		unsafe {
 		    stvec::write(Stvec::new(trap_entry as usize, stvec::TrapMode::Direct));
+		}
+	}
+
+	#[inline]
+	unsafe fn set_next_pc(&self, addr: usize) {
+		unsafe {
+			sepc::write(addr);
+		}
+	}
+
+	#[inline]
+	unsafe fn set_next_user_stack(&self, addr: usize) {
+		unsafe {
+			sscratch::write(addr);
 		}
 	}
 }
@@ -141,6 +155,7 @@ pub unsafe extern "C" fn trap_entry() {
 		save!(s9  => a1[25]),
 		save!(s10 => a1[26]),
 		save!(s11 => a1[27]),
+		save!(gp  => a1[28]),
 		// 调用完整路径函数
 		//
 		// | reg    | position
@@ -170,6 +185,7 @@ pub unsafe extern "C" fn trap_entry() {
 		load!(a1[25] => s9),
 		load!(a1[26] => s10),
 		load!(a1[27] => s11),
+		load!(a1[28] => gp),
 		"2:", // 设置所有调用者寄存器
 		load!(a1[ 0] => ra),
 		load!(a1[ 1] => t0),
@@ -193,6 +209,73 @@ pub unsafe extern "C" fn trap_entry() {
 		exchange!(),
 		r#return!(),
 	)
+}
+
+// a0: cur_task_context_ptr
+// a1: next_task_context_ptr
+#[unsafe(naked)]
+#[unsafe(export_name = "switch")]
+pub unsafe extern "C" fn switch(a0: *const TaskContext, a1: *const TaskContext) {
+	naked_asm!(
+		// save cur task context in TaskManager
+		save!(ra  => a0[0]),
+		save!(sp  => a0[1]),
+		save!(s0  => a0[2]),
+		save!(s1  => a0[3]),
+		save!(s2  => a0[4]),
+		save!(s3  => a0[5]),
+		save!(s4  => a0[6]),
+		save!(s5  => a0[7]),
+		save!(s6  => a0[8]),
+		save!(s7  => a0[9]),
+		save!(s8  => a0[10]),
+		save!(s9  => a0[11]),
+		save!(s10 => a0[12]),
+		save!(s11 => a0[13]),
+		save!(tp  => a0[14]),
+		// get next task context and switch sp
+		load!(a1[0]  => ra),
+		load!(a1[1]  => sp),
+		load!(a1[2]  => s0),
+		load!(a1[3]  => s1),
+		load!(a1[4]  => s2),
+		load!(a1[5]  => s3),
+		load!(a1[6]  => s4),
+		load!(a1[7]  => s5),
+		load!(a1[8]  => s6),
+		load!(a1[9]  => s7),
+		load!(a1[10] => s8),
+		load!(a1[11] => s9),
+		load!(a1[12] => s10),
+		load!(a1[13] => s11),
+		load!(a1[14] => tp),
+		"ret"
+	);
+}
+
+// a0: next_task_context_ptr
+#[unsafe(naked)]
+#[unsafe(export_name = "fast_switch")]
+pub unsafe extern "C" fn fast_switch(a0: *const TaskContext) {
+	naked_asm!(
+		// get next task context and switch sp
+		load!(a0[0]  => ra),
+		load!(a0[1]  => sp),
+		load!(a0[2]  => s0),
+		load!(a0[3]  => s1),
+		load!(a0[4]  => s2),
+		load!(a0[5]  => s3),
+		load!(a0[6]  => s4),
+		load!(a0[7]  => s5),
+		load!(a0[8]  => s6),
+		load!(a0[9]  => s7),
+		load!(a0[10] => s8),
+		load!(a0[11] => s9),
+		load!(a0[12] => s10),
+		load!(a0[13] => s11),
+		load!(a0[14] => tp),
+		"ret"
+	);
 }
 
 pub extern "C" fn fast_handler(
@@ -232,7 +315,7 @@ pub extern "C" fn fast_handler(
 		warn!("PageFault in application, kernel killed it.");
 		warn!("Illegal addr: 0x{:x}", stval);
 		warn!("excption pc: 0x{:x}", sepc::read());
-		TASK_MANAGER.get().unwrap().run_next_app_in_trap();
+		TASK_MANAGER.get().unwrap().run_next_at_trap();
 		ctx.restore()
 	}
 	Trap::Exception(Exception::IllegalInstruction) => {
@@ -240,7 +323,7 @@ pub extern "C" fn fast_handler(
 		ctx.hart().app_info.end();
 		warn!("IllegalInstruction in application, kernel killed it.");
 		warn!("excption pc: 0x{:x}", sepc::read());
-		TASK_MANAGER.get().unwrap().run_next_app_in_trap();
+		TASK_MANAGER.get().unwrap().run_next_at_trap();
 		ctx.restore()
 	}
 	Trap::Exception(Exception::InstructionFault) |
@@ -251,7 +334,7 @@ pub extern "C" fn fast_handler(
 		warn!("Instruction PageFault in application, kernel killed it.");
 		warn!("Illegal addr: 0x{:x}", stval);
 		warn!("excption pc: 0x{:x}", sepc::read());
-		TASK_MANAGER.get().unwrap().run_next_app_in_trap();
+		TASK_MANAGER.get().unwrap().run_next_at_trap();
 		ctx.restore()
 	}
 
@@ -263,7 +346,7 @@ pub extern "C" fn fast_handler(
 
 
 #[unsafe(naked)]
-pub unsafe extern "C" fn boot_entry() -> ! {
+pub unsafe extern "C" fn boot_entry(a0: usize) -> ! {
 	naked_asm!(
 		".align 2",
 		// sscratch is set in load_as_stack in main
@@ -274,9 +357,11 @@ pub unsafe extern "C" fn boot_entry() -> ! {
 	)
 }
 
-pub extern "C" fn boot_handler() {
+pub extern "C" fn boot_handler(start_addr: usize) {
 	unsafe {
 		sstatus::set_spp(SPP::User);
+		sepc::write(start_addr);
+		stvec::write(Stvec::new(trap_entry as usize, stvec::TrapMode::Direct));
 	}
 }
 

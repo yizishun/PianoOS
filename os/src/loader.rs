@@ -12,12 +12,12 @@ use crate::info;
 
 use crate::{arch::common::ArchMem, global::ARCH};
 
-pub struct LoaderElfInfo {
+pub struct Loader {
 	pub num_app: usize,
 	elf_info: [ElfInfo; MAX_APP_NUM]
 }
 
-impl LoaderElfInfo {
+impl Loader {
 	pub fn new() -> Self {
 		let num_app_ptr: *const usize = core::ptr::addr_of!(_num_app);
 		let num_app_usize: usize = unsafe { *num_app_ptr };
@@ -31,7 +31,7 @@ impl LoaderElfInfo {
 			elf.start_addr = app_start_addr[i];
 			elf.end_addr = app_start_addr[i + 1];
 		}
-		LoaderElfInfo {
+		Loader {
 			num_app: num_app_usize,
 			elf_info
 		}
