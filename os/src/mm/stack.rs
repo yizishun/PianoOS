@@ -1,7 +1,7 @@
 use core::intrinsics::forget;
 use core::ptr::NonNull;
 
-use crate::arch::common::ArchHarts;
+use crate::arch::common::{ArchHarts, FlowContext};
 use crate::global::ARCH;
 use crate::{harts::HartContext, config::{USER_STACK_SIZE, KERNEL_STACK_SIZE}};
 use crate::trap::{FreeTrapStack, TrapHandler};
@@ -29,7 +29,6 @@ pub struct KernelStack([u8; KERNEL_STACK_SIZE]);
 
 //                      Stack
 //     low_addr   +----HartContext---+
-//                |  flow_context    |
 //                |  hart_id         |
 //                +----Stack Space---+
 //                |                  |
@@ -105,9 +104,9 @@ impl KernelStack {
 		unsafe { & *self.0.as_mut_ptr().cast() }
     	}
 
-	pub fn init_trap_stack(&'static mut self, hartid: usize) -> FreeTrapStack{
+	pub fn init_trap_stack(&'static mut self, hartid: usize, flow_context: NonNull<FlowContext>) -> FreeTrapStack{
 		let hart_context = self.hart_context_mut();
-		let context_ptr = hart_context.context_ptr();
+		let context_ptr = flow_context;
 		let hart_ptr = unsafe { NonNull::new_unchecked(hart_context) };
 		hart_context.init(hartid);
 
@@ -124,9 +123,9 @@ impl KernelStack {
 	/// Initializes stack for trap handling.
     	/// - Sets up hart context.
     	/// - Creates and loads FreeTrapStack with the stack range.
-    	pub fn load_as_stack(&'static mut self, hartid: usize) {
+    	pub fn load_as_stack(&'static mut self, hartid: usize, flow_context: NonNull<FlowContext>) {
 		let hart_context = self.hart_context_mut();
-		let context_ptr = hart_context.context_ptr();
+		let context_ptr = flow_context;
 		let hart_ptr = unsafe { NonNull::new_unchecked(hart_context) };
 		hart_context.init(hartid);
 

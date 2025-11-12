@@ -1,17 +1,28 @@
 use core::sync::atomic::AtomicU8;
 use core::sync::atomic::Ordering;
-use crate::task::{context::TaskContext, status::TaskStatus};
+use core::cell::SyncUnsafeCell;
+use crate::arch::common::FlowContext;
+use crate::task::status::TaskStatus;
+use crate::task::harts::AppHartInfo;
 
+//TODO: 最好做成可分配可回收的结构
 pub struct TaskControlBlock {
+	// SAFETY: one flow_context will only bind to one harts
+	pub flow_context: SyncUnsafeCell<FlowContext>,
 	pub task_status: AtomicU8,
-	pub task_cx: TaskContext
+	pub app_info: SyncUnsafeCell<AppHartInfo>
 }
 
 impl TaskControlBlock {
-	pub fn new(kstack_ptr: usize) -> Self {
+	pub fn new(app_id: usize, start_addr: usize) -> Self {
 		let task_status = AtomicU8::new(TaskStatus::Ready as u8);
-		let task_cx = TaskContext::goto_restore(kstack_ptr);
-		Self { task_status, task_cx }
+		let app_info = SyncUnsafeCell::new(AppHartInfo::new(app_id));
+		let flow_context= SyncUnsafeCell::new(FlowContext::new(app_id, start_addr));
+		Self {
+			flow_context,
+			task_status, 
+			app_info
+		}
 	}
 
 	pub fn status(&self) -> TaskStatus {

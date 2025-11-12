@@ -4,15 +4,11 @@
 #![feature(ptr_mask)]
 #![feature(core_intrinsics)]
 #![feature(generic_atomic)]
-
-use core::arch::asm;
+#![feature(sync_unsafe_cell)]
 
 use log::info;
 
 use crate::arch::common::ArchPower;
-use crate::arch::common::ArchTrap;
-use crate::arch::common::boot_entry;
-use crate::arch::common::boot_handler;
 use crate::global::*;
 use crate::loader::Loader;
 use crate::logging::PIANOLOGGER;
@@ -51,9 +47,10 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	PLATFORM.call_once(|| Platform::init_platform(device_tree).unwrap());
 
 	// 3. prepare for trap
-	unsafe {
-		KERNEL_STACK[hartid].load_as_stack(hartid); //init HartContext and TrapHandler
-	};
+	TASK_MANAGER.call_once(|| TaskManager::new());
+	let next_app = 
+		//init HartContext, TrapContext, TaskContext
+		TASK_MANAGER.get().unwrap().prepare_next_at_boot(hartid);
 
 	// 4. logging system init and print some infomation
 	PIANOLOGGER.call_once(|| { PianoLogger::set_boot_logger() });
@@ -62,27 +59,24 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	info!("boot hartid: {}", hartid);
 	info!("device tree addr: {:p}", device_tree as *const u8);
 	PLATFORM.get().unwrap().print_platform_info();
-
-	// 5. print some kernel info and app info
 	print_kernel_mem();
 	LOADER.get().unwrap().print_app_info();
 
-	// 6. boot hart start other harts
+	// 5. boot hart start other harts
 	// elf load happen in this func
-	TASK_MANAGER.call_once(|| TaskManager::new());
 	if TASK_MANAGER.get().unwrap().num_app != 0 {
 		//  switch logger
 		PIANOLOGGER.get().unwrap().set_trap_logger();
 		for i in 0..HartContext::get_hartnum() {
 			let start_addr = arch::common::entry::hart_start as usize;
-			sbi_rt::hart_start(i, start_addr, 0);
+			sbi_rt::hart_start(i, start_addr, 0); //TODO: arch specific
 		}
 
 		// 7. boot app
 		TASK_MANAGER
 			.get()
 			.unwrap()
-			.run_next_at_boot()
+			.run_next_at_boot(next_app)
 	} else {
 		info!("No app should be run, kernel shutdown");
 		ARCH.shutdown(false);
@@ -93,14 +87,14 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 
 #[unsafe(no_mangle)]
 extern "C" fn hart_main(hartid: usize, _opaque: usize) -> ! {
-	unsafe {
-		KERNEL_STACK[hartid].load_as_stack(hartid); //init HartContext and TrapHandler
-	}
+	let next_app = 
+		//init HartContext, TrapContext, TaskContext
+		TASK_MANAGER.get().unwrap().prepare_next_at_boot(hartid);
 
 	TASK_MANAGER
 		.get()
 		.unwrap()
-		.run_next_at_boot();
+		.run_next_at_boot(next_app);
 
 	unreachable!();
 }

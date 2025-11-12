@@ -14,11 +14,7 @@ pub use crate::arch::riscv::trap::boot_handler;
 
 // fast handler
 #[cfg(target_arch = "riscv64")]
-pub use crate::arch::riscv::trap::fast_handler;
-
-// switch context
-#[cfg(target_arch = "riscv64")]
-pub use crate::arch::riscv::trap::switch;
+pub use crate::arch::riscv::trap::handler::fast_handler;
 
 // some common behavior
 pub trait ArchMem {

@@ -1,8 +1,9 @@
 use core::{slice::from_raw_parts, str::from_utf8};
 
+use alloc::task;
 use log::warn;
 
-use crate::{global::{TASK_MANAGER, USER_STACK}, harts::hart_context_in_trap_stage, print};
+use crate::{global::{TASK_MANAGER, USER_STACK}, harts::{hart_context_in_trap_stage, task_context_in_trap_stage}, print};
 
 const FD_STDOUT: usize = 1;
 
@@ -24,13 +25,12 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
 }
 
 fn check_buf_valid(buf: *const u8, len: usize) -> bool {
-	let hart_context = hart_context_in_trap_stage();
-	let harid = hart_context.hartid();
-	let cur_app = hart_context.app_info.cur_app;
+	let app_info = unsafe { &(*task_context_in_trap_stage().app_info.get()) };
+	let cur_app = app_info.cur_app;
 	let app_size = TASK_MANAGER.get().unwrap().app_size(cur_app);
 
-	let app_range = &hart_context.app_info.app_range;
-	let app_stack_range = unsafe { USER_STACK[harid].as_ptr_range() };
+	let app_range = app_info.app_range.clone();
+	let app_stack_range = unsafe { USER_STACK[cur_app].as_ptr_range() };
 	if unsafe { 
 		(app_range.contains(&buf) && app_range.contains(&buf.add(len))) ||
 		(app_stack_range.contains(&buf) && app_stack_range.contains(&buf.add(len)))

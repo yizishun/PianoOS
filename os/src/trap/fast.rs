@@ -1,5 +1,8 @@
 ﻿use core::{mem::MaybeUninit, ptr::NonNull};
+use riscv::register::mstatus::set_fs;
+
 use crate::harts::HartContext;
+use crate::task::block::TaskControlBlock;
 use crate::trap::TrapHandler;
 use crate::trap::entire::EntireHandler;
 use crate::arch::common::FlowContext;
@@ -36,6 +39,13 @@ impl FastContext {
 	#[inline]
 	pub fn regs(&mut self) -> &mut FlowContext {
 		unsafe { self.0.context.as_mut() }
+	}
+
+	#[inline]
+	pub fn tasks(&mut self) -> &mut TaskControlBlock {
+		unsafe {
+			(self.0.context.as_mut() as *mut FlowContext as *mut TaskControlBlock).as_mut().unwrap()
+		}
 	}
 
 	/// 获取hart local的东西。

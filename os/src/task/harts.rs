@@ -16,13 +16,13 @@ pub struct AppHartInfo {
 }
 
 impl AppHartInfo {
-	pub fn new() -> Self {
+	pub fn new(app_id: usize) -> Self {
 		let mut record = BTreeMap::new();
 		for syscall in SyscallID::iter() {
 			record.insert(syscall, 0);
 		}
 		AppHartInfo { 
-			cur_app: 0, 
+			cur_app: app_id, 
 			syscall_record: record,
 			start_time: 0,
 			end_time: 0,
@@ -31,7 +31,8 @@ impl AppHartInfo {
 	}
 
 	pub fn start(&mut self, cur_app: usize, app_range: Range<*const u8>) {
-		self.cur_app = cur_app;
+		//self.cur_app = cur_app;
+		assert!(cur_app == self.cur_app);
 		self.clear_syscall_record();
 		self.start_time = ARCH.time_ns();
 		self.app_range = app_range;

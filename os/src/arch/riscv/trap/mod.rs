@@ -1,15 +1,12 @@
 use core::{arch::naked_asm, usize};
-use riscv::register::{sepc, sscratch, sstatus::{self, SPP, Sstatus}, stvec::{self, Stvec}};
-use log::warn;
-use riscv::interrupt::supervisor::Exception;
-use riscv::register::{scause, stval};
-use riscv::register::mcause::Trap;
+use core::arch::asm;
+use riscv::register::{sepc, sscratch, sstatus::{self, SPP}, stvec::{self, Stvec}};
 
-use crate::{arch::{common::ArchTrap, riscv::Riscv64}, harts::hart_context_in_trap_stage, task::context::TaskContext};
-use crate::TASK_MANAGER;
-use crate::syscall::syscall;
-use crate::trap::fast::FastResult;
-use crate::trap::fast::FastContext;
+use crate::config::USER_STACK_SIZE;
+use crate::{arch::{common::ArchTrap, riscv::Riscv64}};
+use crate::USER_STACK;
+use crate::mm::stack::UserStack;
+pub mod handler;
 
 impl<C> ArchTrap for Riscv64<C> {
 	#[inline]
@@ -84,6 +81,62 @@ pub struct FlowContext {
 	pub tp: usize,      // 29..
 	pub sp: usize,      // 30..
 	pub pc: usize,      // 31..
+}
+
+impl FlowContext {
+	pub const ZERO: Self = Self {
+		ra: 0,
+		t: [0; 7],
+		a: [0; 8],
+		s: [0; 12],
+		gp: 0,
+		tp: 0,
+		sp: 0,
+		pc: 0
+	};
+
+	pub fn new(app_id: usize, start_addr: usize) -> Self {
+		#[allow(static_mut_refs)]
+		let user_stack = unsafe {
+			USER_STACK.get(app_id).unwrap() 
+				as *const UserStack as usize
+		};
+		Self{
+			ra: 0,
+			t: [0; 7],
+			a: [0; 8],
+			s: [0; 12],
+			gp: 0,
+			tp: 0,
+			sp: user_stack + USER_STACK_SIZE,
+			pc: start_addr
+		}
+	}
+
+	/// 从上下文向硬件加载非调用规范约定的寄存器。
+	#[inline]
+	pub(crate) unsafe fn load_others(&self) {
+		unsafe {
+			asm!(
+				//"mv         gp, {gp}",
+				//"mv         tp, {tp}",
+				"csrw mscratch, {sp}",
+				"csrw     mepc, {pc}",
+				//gp = in(reg) self.gp,
+				//tp = in(reg) self.tp,
+				sp = in(reg) self.sp,
+				pc = in(reg) self.pc,
+			);
+		}
+	}
+
+	pub fn set_sp(&mut self, sp: usize) {
+		self.sp = sp;
+	}
+
+	pub fn set_pc(&mut self, pc: usize) {
+		self.pc = pc;
+	}
 }
 
 #[unsafe(naked)]
@@ -210,140 +263,6 @@ pub unsafe extern "C" fn trap_entry() {
 		r#return!(),
 	)
 }
-
-// a0: cur_task_context_ptr
-// a1: next_task_context_ptr
-#[unsafe(naked)]
-#[unsafe(export_name = "switch")]
-pub unsafe extern "C" fn switch(a0: *const TaskContext, a1: *const TaskContext) {
-	naked_asm!(
-		// save cur task context in TaskManager
-		save!(ra  => a0[0]),
-		save!(sp  => a0[1]),
-		save!(s0  => a0[2]),
-		save!(s1  => a0[3]),
-		save!(s2  => a0[4]),
-		save!(s3  => a0[5]),
-		save!(s4  => a0[6]),
-		save!(s5  => a0[7]),
-		save!(s6  => a0[8]),
-		save!(s7  => a0[9]),
-		save!(s8  => a0[10]),
-		save!(s9  => a0[11]),
-		save!(s10 => a0[12]),
-		save!(s11 => a0[13]),
-		save!(tp  => a0[14]),
-		// get next task context and switch sp
-		load!(a1[0]  => ra),
-		load!(a1[1]  => sp),
-		load!(a1[2]  => s0),
-		load!(a1[3]  => s1),
-		load!(a1[4]  => s2),
-		load!(a1[5]  => s3),
-		load!(a1[6]  => s4),
-		load!(a1[7]  => s5),
-		load!(a1[8]  => s6),
-		load!(a1[9]  => s7),
-		load!(a1[10] => s8),
-		load!(a1[11] => s9),
-		load!(a1[12] => s10),
-		load!(a1[13] => s11),
-		load!(a1[14] => tp),
-		"ret"
-	);
-}
-
-// a0: next_task_context_ptr
-#[unsafe(naked)]
-#[unsafe(export_name = "fast_switch")]
-pub unsafe extern "C" fn fast_switch(a0: *const TaskContext) {
-	naked_asm!(
-		// get next task context and switch sp
-		load!(a0[0]  => ra),
-		load!(a0[1]  => sp),
-		load!(a0[2]  => s0),
-		load!(a0[3]  => s1),
-		load!(a0[4]  => s2),
-		load!(a0[5]  => s3),
-		load!(a0[6]  => s4),
-		load!(a0[7]  => s5),
-		load!(a0[8]  => s6),
-		load!(a0[9]  => s7),
-		load!(a0[10] => s8),
-		load!(a0[11] => s9),
-		load!(a0[12] => s10),
-		load!(a0[13] => s11),
-		load!(a0[14] => tp),
-		"ret"
-	);
-}
-
-pub extern "C" fn fast_handler(
-    mut ctx: FastContext,
-    a1: usize,
-    a2: usize,
-    a3: usize,
-    a4: usize,
-    a5: usize,
-    a6: usize,
-    a7: usize,
-) -> FastResult {
-    let save_regs = |ctx: &mut FastContext| {
-	ctx.regs().a = [ctx.a0(), a1, a2, a3, a4, a5, a6, a7];
-    };
-    let scause = scause::read();
-    let stval = stval::read();
-    match scause.cause()
-	.try_into::<riscv::interrupt::Interrupt, riscv::interrupt::supervisor::Exception>()
-	.unwrap() {
-
-	Trap::Exception(Exception::UserEnvCall) => {
-		save_regs(&mut ctx);
-		unsafe {
-			sepc::write(sepc::read() + 4);
-			ctx.regs().a[0] = 
-			syscall(a7.try_into().unwrap(), [ctx.a0(), a1, a2]) as usize
-		}
-		ctx.restore()
-	}
-	Trap::Exception(Exception::StoreFault) |
-	Trap::Exception(Exception::StorePageFault) |
-	Trap::Exception(Exception::LoadFault) | 
-	Trap::Exception(Exception::LoadMisaligned) => {
-		save_regs(&mut ctx);
-		ctx.hart().app_info.end();
-		warn!("PageFault in application, kernel killed it.");
-		warn!("Illegal addr: 0x{:x}", stval);
-		warn!("excption pc: 0x{:x}", sepc::read());
-		TASK_MANAGER.get().unwrap().run_next_at_trap();
-		ctx.restore()
-	}
-	Trap::Exception(Exception::IllegalInstruction) => {
-		save_regs(&mut ctx);
-		ctx.hart().app_info.end();
-		warn!("IllegalInstruction in application, kernel killed it.");
-		warn!("excption pc: 0x{:x}", sepc::read());
-		TASK_MANAGER.get().unwrap().run_next_at_trap();
-		ctx.restore()
-	}
-	Trap::Exception(Exception::InstructionFault) |
-	Trap::Exception(Exception::InstructionMisaligned) |
-	Trap::Exception(Exception::InstructionPageFault) => {
-		save_regs(&mut ctx);
-		ctx.hart().app_info.end();
-		warn!("Instruction PageFault in application, kernel killed it.");
-		warn!("Illegal addr: 0x{:x}", stval);
-		warn!("excption pc: 0x{:x}", sepc::read());
-		TASK_MANAGER.get().unwrap().run_next_at_trap();
-		ctx.restore()
-	}
-
-	_ => {
-	    	panic!("Unsupported trap {:?}, stval = {:#x}!", scause.cause(), stval);
-	}
-    }
-}
-
 
 #[unsafe(naked)]
 pub unsafe extern "C" fn boot_entry(a0: usize) -> ! {

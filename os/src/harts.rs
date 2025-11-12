@@ -8,20 +8,17 @@ use core::arch::asm;
 //
 // HartContext will always at the end of Stack, so we should make sure
 // STACK_SIZE_PER_HART is a multiple of b.
-use crate::{arch::common::{ArchHarts, FlowContext}, task::harts::AppHartInfo, config::KERNEL_STACK_SIZE, global::ARCH, trap::TrapHandler};
+use crate::{arch::common::{ArchHarts, FlowContext}, config::KERNEL_STACK_SIZE, global::ARCH, task::{block::TaskControlBlock, harts::AppHartInfo}, trap::TrapHandler};
 const _: () = assert!(KERNEL_STACK_SIZE % core::mem::align_of::<HartContext>() == 0);
 
 #[repr(C, align(128))]
 pub struct HartContext {
-	flow_context: crate::arch::common::FlowContext,
 	hartid: usize,
-	pub app_info: AppHartInfo
 }
 
 impl HartContext {
 	pub fn init(&mut self, hartid: usize){
 		self.hartid = hartid;
-		self.app_info = AppHartInfo::new();
 	}
 
 	pub fn get_hartnum() -> usize {
@@ -31,17 +28,14 @@ impl HartContext {
 	pub fn hartid(&self) -> usize {
 		self.hartid
 	}
+}
 
-	pub fn context_ptr(&mut self) -> NonNull<FlowContext>{
-		unsafe {
-			NonNull::new_unchecked(&mut self.flow_context)
-		}
+pub fn trap_handler_in_trap_stage() -> &'static mut TrapHandler {
+	let mut scratch: *mut TrapHandler;
+	unsafe {
+		asm!("mv {}, tp", out(reg) scratch);
+		scratch.as_mut().unwrap()
 	}
-
-	pub fn set_hartid(&mut self, hartid: usize) {
-		self.hartid = hartid;
-	}
-
 }
 
 pub fn hart_context_in_boot_stage() -> &'static mut HartContext {
@@ -60,6 +54,25 @@ pub fn hart_context_in_trap_stage() -> &'static mut HartContext {
 	let mut hart_context = unsafe { (*scratch).hart };
 	unsafe {
 		hart_context.as_mut()
+	}
+}
+
+pub fn task_block_in_boot_stage() -> &'static mut TaskControlBlock {
+	let scratch = ARCH.get_scratch() as *mut TrapHandler;
+	let task_block = unsafe { (*scratch).context.as_ptr() as *mut TaskControlBlock };
+	unsafe {
+		task_block.as_mut().unwrap()
+	}
+}
+
+pub fn task_context_in_trap_stage() -> &'static mut TaskControlBlock {
+	let mut scratch: *mut TrapHandler;
+	unsafe {
+		asm!("mv {}, tp", out(reg) scratch);
+	}
+	let task_block = unsafe { (*scratch).hart.as_ptr() as *mut TaskControlBlock };
+	unsafe {
+		task_block.as_mut().unwrap()
 	}
 }
 

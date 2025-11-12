@@ -125,7 +125,7 @@ pub struct TrapHandler {
 	///
 	/// - 发生陷入时，将寄存器保存到此对象。
 	/// - 离开陷入处理时，按此对象的内容设置寄存器。
-	context: NonNull<FlowContext>,
+	pub context: NonNull<FlowContext>,
 	/// 快速路径函数。
 	///
 	/// 必须在初始化陷入时设置好。
