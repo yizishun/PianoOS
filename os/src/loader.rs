@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use log::debug;
 use core::{ops::Range, ptr::copy_nonoverlapping};
 use elf::{
 	ElfBytes,
@@ -6,7 +7,7 @@ use elf::{
 	endian::AnyEndian,
 	segment::ProgramHeader
 };
-use crate::config::MAX_APP_NUM;
+use crate::{config::MAX_APP_NUM, println};
 use crate::_num_app;
 use crate::info;
 
@@ -63,6 +64,7 @@ impl Loader {
 
 		let elf = self.elf_info.get(app_id).unwrap();
 		let off = elf.start_addr - self.elf_info.get(0).unwrap().start_addr;
+		assert!(elf.start_addr != 0);
 		let dst = (APP_BASE_ADDR + off) as *const u8;
 		elf.load_elf(dst)
 	}
@@ -82,6 +84,7 @@ impl ElfInfo {
 
 	pub fn load_elf(&self, dst: *const u8) -> Range<*const u8> {
 		let count = self.end_addr - self.start_addr;
+		//info!("start: {}, end: {}", self.start_addr, self.end_addr);
 		let dst_start = dst;
 		let slice = unsafe {
 			core::slice::from_raw_parts(self.start_addr as *const u8, count)

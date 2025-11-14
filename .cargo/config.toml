@@ -1,5 +1,5 @@
-[term]
-verbose = true
+#[term]
+#verbose = true
 
 [alias]
 xtask = "run --package xtask --release --"

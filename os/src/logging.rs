@@ -56,10 +56,8 @@ impl Log for BootLogger {
 		};
 		let ansi_reset = "\x1b[0m";
 		let bold = "\x1b[1;37m";
-		let hart_id = hart_context_in_boot_stage().hartid();
-		println!("{bold}[kernel]{reset}{color_log} {:<5}[{:>2}]{reset} - {}",
+		println!("{bold}[kernel]{reset}{color_log} {:<5}{reset} - {}",
 			 record.level(),
-			 hart_id,
 			 record.args(),
 			 reset = ansi_reset,
 			 color_log = ansi_color,

@@ -15,7 +15,7 @@ pub struct QemuArg {
 	#[arg(long, default_value_t = false)]
     	pub release: bool,
 
-	#[arg(long, default_value_t = 8)]
+	#[arg(long, default_value_t = 1)]
 	pub smp: usize,
 
 	#[arg(long, default_value = "virt")]
@@ -33,10 +33,10 @@ pub struct QemuArg {
 	#[arg(long)]
 	pub qemu: Option<String>,
 
-	#[arg(long)]
+	#[arg(long, short = 's')]
 	pub gdbserver: bool,
 
-	#[arg(long)]
+	#[arg(long, short = 'c')]
 	pub gdbclient: bool,
 
 	#[arg(long)]

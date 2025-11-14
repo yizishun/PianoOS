@@ -38,21 +38,10 @@ extern crate alloc;
 
 #[unsafe(no_mangle)]
 extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
-	// 1. clear bss, heap init and hart info init
 	clear_bss();
 	heap_init();
-	LOADER.call_once(|| Loader::new());
 
-	// 2. parse device tree and init platform
 	PLATFORM.call_once(|| Platform::init_platform(device_tree).unwrap());
-
-	// 3. prepare for trap
-	TASK_MANAGER.call_once(|| TaskManager::new());
-	let next_app = 
-		//init HartContext, TrapContext, TaskContext
-		TASK_MANAGER.get().unwrap().prepare_next_at_boot(hartid);
-
-	// 4. logging system init and print some infomation
 	PIANOLOGGER.call_once(|| { PianoLogger::set_boot_logger() });
 	logging::init().expect("Logging System init fail");
 	info!("Logging system init success");
@@ -60,9 +49,17 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	info!("device tree addr: {:p}", device_tree as *const u8);
 	PLATFORM.get().unwrap().print_platform_info();
 	print_kernel_mem();
+
+	LOADER.call_once(|| Loader::new());
+	TASK_MANAGER.call_once(|| 
+		TaskManager::new()
+	);
+	let next_app = 
+		//init HartContext, TrapContext, TaskContext
+		TASK_MANAGER.get().unwrap().prepare_next_at_boot(hartid);
+
 	LOADER.get().unwrap().print_app_info();
 
-	// 5. boot hart start other harts
 	// elf load happen in this func
 	if TASK_MANAGER.get().unwrap().num_app != 0 {
 		//  switch logger
@@ -72,7 +69,6 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 			sbi_rt::hart_start(i, start_addr, 0); //TODO: arch specific
 		}
 
-		// 7. boot app
 		TASK_MANAGER
 			.get()
 			.unwrap()
