@@ -43,6 +43,8 @@ fn check_buf_valid(buf: *const u8, len: usize) -> bool {
 		warn!("buf size: 0x{:x}", len as usize);
 		warn!("ustack start: 0x{:x}", app_stack_range.start as usize);
 		warn!("ustack end  : 0x{:x}", app_stack_range.end as usize);
+		warn!("app start: 0x{:x}", app_range.start as usize);
+		warn!("app end:   0x{:x}", app_range.end as usize);
 		warn!("app size: 0x{:x}", app_size);
 		false
 	}

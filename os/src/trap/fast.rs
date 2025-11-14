@@ -86,6 +86,14 @@ impl FastContext {
 	//        self.0.context = others;
 	//        FastResult::Switch
 	//    }
+	// 丢弃当前上下文，并直接切换到另一个上下文。
+	#[inline]
+	pub fn switch_to(self) -> FastResult {
+	        //unsafe { others.as_ref().load_others() }; //这两步会发生在task里面，但是其实我还是觉得发生在这里比较合理
+	        //self.0.context = others;
+	        FastResult::Switch
+	}
+
 
 	/// 向完整路径 `f` 传递对象 `t`。
 	///

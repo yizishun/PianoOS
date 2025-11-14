@@ -3,6 +3,7 @@ use crate::utils::{CmdOptional, cargo};
 use crate::USER_PACKAGE_NAME;
 use std::ffi::{OsStr, OsString};
 use std::process::ExitStatus;
+use std::ptr::fn_addr_eq;
 use log::{error, info};
 use std::path::{Path, PathBuf};
 use std::process::Command;

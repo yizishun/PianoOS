@@ -5,9 +5,10 @@ use crate::trap::entire::EntireContext;
 use crate::trap::entire::EntireResult;
 use crate::trap::fast::FastResult;
 use crate::trap::fast::FastContext;
+use log::debug;
+use log::info;
 use log::warn;
 use riscv::interrupt::supervisor::Exception;
-use riscv::register::mepc;
 use riscv::register::sscratch;
 use riscv::register::{scause, stval};
 use riscv::register::mcause::Trap;
@@ -47,7 +48,7 @@ pub extern "C" fn fast_handler(
 		warn!("Illegal addr: 0x{:x}", stval);
 		warn!("excption pc: 0x{:x}", sepc::read());
 		TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
-		ctx.restore()
+		ctx.switch_to()
 	}
 	Trap::Exception(Exception::IllegalInstruction) => {
 		unsafe {
@@ -56,7 +57,7 @@ pub extern "C" fn fast_handler(
 		warn!("IllegalInstruction in application, kernel killed it.");
 		warn!("excption pc: 0x{:x}", sepc::read());
 		TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
-		ctx.restore()
+		ctx.switch_to()
 	}
 	Trap::Exception(Exception::InstructionFault) |
 	Trap::Exception(Exception::InstructionMisaligned) |
@@ -68,7 +69,7 @@ pub extern "C" fn fast_handler(
 		warn!("Illegal addr: 0x{:x}", stval);
 		warn!("excption pc: 0x{:x}", sepc::read());
 		TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
-		ctx.restore()
+		ctx.switch_to()
 	}
 
 	_ => {
@@ -99,9 +100,12 @@ pub extern "C" fn syscall_handler(
 		SyscallID::Yield => {
 			ctx.continue_with(yield_handler, ())
 		},
+		SyscallID::Exit => {
+			ctx.switch_to()
+		}
 		_ => {
 			unsafe {
-			    	mepc::write(mepc::read() + 4);
+				sepc::write(sepc::read() + 4);
 			}
 			ctx.restore()
 		}
@@ -111,7 +115,8 @@ pub extern "C" fn syscall_handler(
 pub extern "C" fn yield_handler(ctx: EntireContext) -> EntireResult {
 	let mut split_ctx = ctx.split().0;
 	split_ctx.regs().set_sp(sscratch::read());
-	split_ctx.regs().set_pc(mepc::read() + 4);
+	split_ctx.regs().set_pc(sepc::read() + 4);
+	info!("yield");
 	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next();
 	EntireResult::Restore
 }

@@ -70,7 +70,7 @@ pub fn task_context_in_trap_stage() -> &'static mut TaskControlBlock {
 	unsafe {
 		asm!("mv {}, tp", out(reg) scratch);
 	}
-	let task_block = unsafe { (*scratch).hart.as_ptr() as *mut TaskControlBlock };
+	let task_block = unsafe { (*scratch).context.as_ptr() as *mut TaskControlBlock };
 	unsafe {
 		task_block.as_mut().unwrap()
 	}

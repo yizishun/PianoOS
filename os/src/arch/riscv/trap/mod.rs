@@ -120,8 +120,8 @@ impl FlowContext {
 			asm!(
 				//"mv         gp, {gp}",
 				//"mv         tp, {tp}",
-				"csrw mscratch, {sp}",
-				"csrw     mepc, {pc}",
+				"csrw sscratch, {sp}",
+				"csrw     sepc, {pc}",
 				//gp = in(reg) self.gp,
 				//tp = in(reg) self.tp,
 				sp = in(reg) self.sp,

@@ -107,7 +107,7 @@ pub fn init() -> Result<(), SetLoggerError> {
 			      Some("TRACE") => LevelFilter::Trace,
 			      Some("DEBUG") => LevelFilter::Debug,
 			      Some("OFF") => LevelFilter::Off,
-			      None | _ => LevelFilter::Trace,
+			      None | _ => LevelFilter::Info,
 		      });
 	Ok(())
 }

@@ -1,7 +1,7 @@
 use core::ops::Range;
 use core::ptr::{NonNull, null};
 use core::sync::atomic::Ordering;
-use core::array;
+use core::{array, num};
 
 use log::info;
 use spin::mutex::Mutex;
@@ -11,7 +11,7 @@ use crate::arch::common::{ArchPower, FlowContext, boot_entry, boot_handler};
 use crate::config::MAX_APP_NUM;
 use crate::harts::{task_context_in_trap_stage, trap_handler_in_trap_stage};
 use crate::task::block::TaskControlBlock;
-use crate::task::status::TaskStatus;
+use crate::task::status::{ReadyLevel, TaskStatus};
 
 pub mod harts;
 pub mod block;
@@ -43,7 +43,11 @@ impl TaskManager {
 		// init kernel stacks and taskControlBlocks
 		let tasks: [TaskControlBlock; MAX_APP_NUM] = 
 			array::from_fn(|i| {
-				TaskControlBlock::new(i, app_range[i].start as usize)
+				if i < num_app {
+					TaskControlBlock::new(i, app_range[i].start as usize, TaskStatus::Ready(ReadyLevel::High))
+				} else {
+					TaskControlBlock::new(i, app_range[i].start as usize, TaskStatus::Exited)
+				}
 			});
 		TaskManager { 
 			num_app: num_app,
@@ -65,8 +69,9 @@ impl TaskManager {
 			self.tasks.iter().take(self.num_app)
 				.all(|f| f.status() == TaskStatus::Exited);
 		if all_finished {
-			*self.finished.lock() = true;
+			let mut lock = self.finished.lock();
 			info!("All applications completed! Kennel shutdown");
+			*lock = true;
 			ARCH.shutdown(false);
 		} else {
 			//info!("Waiting other program finished");
@@ -79,10 +84,23 @@ impl TaskManager {
 	/// this will find next ready app and set running(use CAS)
 	fn find_next_ready_and_set_run(&self) -> usize {
 		loop {
+			use ReadyLevel::*;
+			let mut best_id: Option<usize> = None;
+			let mut best_level = Low;
 			for (id, task) in self.tasks.iter().enumerate() {
-				if task.task_status.compare_exchange(
-					TaskStatus::Ready as u8,
-					TaskStatus::Running as u8,
+				let status = TaskStatus::try_from(task.task_status.load(Ordering::Relaxed)).unwrap();
+				if let TaskStatus::Ready(level) = status {
+					if best_id.is_none() || level > best_level {
+						best_id = Some(id);
+						best_level = level;
+					}
+				}
+
+			}
+			if let Some(id) = best_id {
+				if self.tasks[id].task_status.compare_exchange(
+					u8::from(TaskStatus::Ready(best_level)),
+					u8::from(TaskStatus::Running),
 					Ordering::Acquire,
 					Ordering::Relaxed).is_ok() {
 					return id;
@@ -124,7 +142,7 @@ impl TaskManager {
 		}
 	}
 
-	pub fn run_next_at_trap(&self) {
+	pub fn run_next_at_trap(&self) -> usize{
 		let next_app = self.find_next_ready_and_set_run();
 		let next_task_context = &self.tasks[next_app];
 		let next_flow_context = next_task_context.flow_context.get() as *mut FlowContext;
@@ -146,7 +164,7 @@ impl TaskManager {
 				.start(next_app, next_app_range.clone());
 		}
 
-		info!("Kernel loading app({})", next_app);
+		next_app
 	}
 
 	pub fn exit_cur_and_run_next(&self) {
@@ -154,14 +172,19 @@ impl TaskManager {
 		let task_block = self.tasks.get(app_id).unwrap();
 		assert!(task_block.status() == TaskStatus::Running, "this task is not Running, something may be wrong");
 		task_block.mark_exit();
-		self.run_next_at_trap();
+		let next_app = self.run_next_at_trap();
+		info!("Kernel Start to app {}", next_app);
 	}
 
 	pub fn suspend_cur_and_run_next(&self) {
 		let app_id = unsafe { task_context_in_trap_stage().app_info.get().as_ref().unwrap().cur_app };
 		let task_block = self.tasks.get(app_id).unwrap();
 		assert!(task_block.status() == TaskStatus::Running, "this task is not Running, something may be wrong");
-		task_block.mark_suspend();
-		self.run_next_at_trap();
+		task_block.mark_suspend_low();
+		let next_app = self.run_next_at_trap();
+		if next_app != app_id {
+			task_block.mark_suspend_high();
+		}
+		info!("Kernel Switch to app {}", next_app);
 	}
 }
