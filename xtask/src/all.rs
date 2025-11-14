@@ -7,7 +7,6 @@ use crate::user::{self, UserArg};
 use crate::{kernel, qemu};
 use crate::kernel::KernelArg;
 use crate::qemu::QemuArg;
-use crate::utils::cargo;
 use crate::USER_PACKAGE_NAME;
 
 #[derive(Debug, Args, Clone)]
@@ -36,43 +35,55 @@ pub struct AllArg {
 
 	#[arg(long)]
 	pub qemu: Option<String>,
+
+	#[arg(long)]
+	pub gdbserver: bool,
+
+	#[arg(long)]
+	pub gdbclient: bool,
+
+	#[arg(long)]
+	pub gdb_bin: Option<String>,
 }
 
 #[must_use]
 pub fn run(arg: &AllArg) -> Option<ExitStatus> {
-    let arch = &arg.target;
-    let release = arg.release;
+	let arch = &arg.target;
+	let release = arg.release;
 
-    let uarg = UserArg {
-        target: arg.target.clone() 
-    };
-    info!("Building User package: {USER_PACKAGE_NAME}");
-    let u_status = user::run(&uarg)?;
-    if !u_status.success() {
-        error!("User Build fail.");
-        return Some(u_status);
-    }
+	let uarg = UserArg {
+		target: arg.target.clone() 
+	};
+	info!("Building User package: {USER_PACKAGE_NAME}");
+	let u_status = user::run(&uarg)?;
+	if !u_status.success() {
+		error!("User Build fail.");
+		return Some(u_status);
+	}
 
-    let karg = KernelArg { 
-        target: arg.target.clone(),
-        release
-    };
-    info!("Building Kernel");
-    let k_status = kernel::run(&karg)?;
-    if !k_status.success() {
-        error!("Kernel Build fail.");
-        return Some(k_status);
-    }
+	let karg = KernelArg { 
+		target: arg.target.clone(),
+		release
+	};
+	info!("Building Kernel");
+	let k_status = kernel::run(&karg)?;
+	if !k_status.success() {
+		error!("Kernel Build fail.");
+		return Some(k_status);
+	}
 
-    let qarg = QemuArg {
-        target: arg.target.clone(),
-        release,
-        smp: arg.smp,
-        machine: arg.machine.clone(),
-        bios: arg.bios.clone(),
-        gui: arg.gui,
-        base_addr: arg.base_addr.clone(),
-        qemu: arg.qemu.clone(),
-    };
-    qemu::run(&qarg)
+	let qarg = QemuArg {
+		target: arg.target.clone(),
+		release,
+		smp: arg.smp,
+		machine: arg.machine.clone(),
+		bios: arg.bios.clone(),
+		gui: arg.gui,
+		base_addr: arg.base_addr.clone(),
+		qemu: arg.qemu.clone(),
+		gdbserver: arg.gdbserver,
+		gdbclient: arg.gdbclient,
+		gdb_bin: arg.gdb_bin.clone()
+	};
+	qemu::run(&qarg)
 }
