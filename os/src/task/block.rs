@@ -35,8 +35,13 @@ impl TaskControlBlock {
 		self.task_status.store(u8::from(TaskStatus::Ready(ReadyLevel::Low)), Ordering::Release);
 	}
 
-	pub fn mark_suspend_high(&self) {
-		self.task_status.store(u8::from(TaskStatus::Ready(ReadyLevel::High)), Ordering::Release);
+	pub fn mark_suspend_high_cas(&self, cur: TaskStatus) {
+		let _ = self.task_status.compare_exchange(
+			u8::from(cur),
+			u8::from(TaskStatus::Ready(ReadyLevel::High)), 
+			Ordering::Acquire,
+			Ordering::Relaxed
+		);
 	}
 
 	pub fn mark_exit(&self) {

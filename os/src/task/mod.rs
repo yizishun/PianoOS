@@ -103,6 +103,7 @@ impl TaskManager {
 					u8::from(TaskStatus::Running),
 					Ordering::Acquire,
 					Ordering::Relaxed).is_ok() {
+					assert!(self.tasks[id].status() == TaskStatus::Running);
 					return id;
 				}
 			}
@@ -144,6 +145,7 @@ impl TaskManager {
 
 	pub fn run_next_at_trap(&self) -> usize{
 		let next_app = self.find_next_ready_and_set_run();
+		assert!(self.tasks[next_app].status() == TaskStatus::Running);
 		let next_task_context = &self.tasks[next_app];
 		let next_flow_context = next_task_context.flow_context.get() as *mut FlowContext;
 		let next_app_range = &self.app_range[next_app];
@@ -164,6 +166,7 @@ impl TaskManager {
 				.start(next_app, next_app_range.clone());
 		}
 
+		assert!(self.tasks[next_app].status() == TaskStatus::Running);
 		next_app
 	}
 
@@ -173,7 +176,8 @@ impl TaskManager {
 		assert!(task_block.status() == TaskStatus::Running, "this task is not Running, something may be wrong");
 		task_block.mark_exit();
 		let next_app = self.run_next_at_trap();
-		info!("Kernel Start to app {}", next_app);
+		assert!(self.tasks[next_app].status() == TaskStatus::Running);
+		info!("Kernel end {} and switch to app {}", app_id, next_app);
 	}
 
 	pub fn suspend_cur_and_run_next(&self) {
@@ -182,9 +186,10 @@ impl TaskManager {
 		assert!(task_block.status() == TaskStatus::Running, "this task is not Running, something may be wrong");
 		task_block.mark_suspend_low();
 		let next_app = self.run_next_at_trap();
+		assert!(self.tasks[next_app].status() == TaskStatus::Running);
 		if next_app != app_id {
-			task_block.mark_suspend_high();
+			task_block.mark_suspend_high_cas(TaskStatus::Ready(ReadyLevel::Low));
 		}
-		info!("Kernel Switch to app {}", next_app);
+		info!("Kernel suspend {} switch to app {}", app_id, next_app);
 	}
 }

@@ -116,7 +116,6 @@ pub extern "C" fn yield_handler(ctx: EntireContext) -> EntireResult {
 	let mut split_ctx = ctx.split().0;
 	split_ctx.regs().set_sp(sscratch::read());
 	split_ctx.regs().set_pc(sepc::read() + 4);
-	info!("yield");
 	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next();
 	EntireResult::Restore
 }
