@@ -1,4 +1,5 @@
-pub const VIRT_FREQUNCY: i32 = 10;
+pub const VIRT_FREQUNCY: usize = 10 * 1_000_000; //hz 即1s跑这么多周期
+pub const TICK_MS: usize = 1;
 pub const KERNEL_HEAP_SIZE: usize = 32 * 1024;
 pub const KERNEL_STACK_SIZE: usize = 128 * 1024;
 pub const USER_STACK_SIZE: usize = 4 * 1024;

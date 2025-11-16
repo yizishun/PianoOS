@@ -1,5 +1,6 @@
 use core::{arch::naked_asm, usize};
 use core::arch::asm;
+use riscv::register::sie;
 use riscv::register::{sepc, sscratch, sstatus::{self, SPP}, stvec::{self, Stvec}};
 
 use crate::config::USER_STACK_SIZE;
@@ -281,6 +282,7 @@ pub extern "C" fn boot_handler(start_addr: usize) {
 		sstatus::set_spp(SPP::User);
 		sepc::write(start_addr);
 		stvec::write(Stvec::new(trap_entry as usize, stvec::TrapMode::Direct));
+		sie::set_stimer();
 	}
 }
 

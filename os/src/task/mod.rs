@@ -7,8 +7,8 @@ use log::info;
 use spin::mutex::Mutex;
 
 use crate::global::{ARCH, KERNEL_STACK, LOADER};
-use crate::arch::common::{ArchPower, FlowContext, boot_entry, boot_handler};
-use crate::config::MAX_APP_NUM;
+use crate::arch::common::{ArchPower, ArchTime, FlowContext, boot_entry, boot_handler};
+use crate::config::{MAX_APP_NUM, TICK_MS};
 use crate::harts::{task_context_in_trap_stage, trap_handler_in_trap_stage};
 use crate::task::block::TaskControlBlock;
 use crate::task::status::{ReadyLevel, TaskStatus};
@@ -131,12 +131,13 @@ impl TaskManager {
 			next_task_context.app_info.get().as_mut().unwrap()
 				.start(next_app, next_app_range.clone());
 		}
-		// init sepc, sstatus, stvec
+		// init sepc, sstatus, stvec, stie
 		boot_handler(next_app_range.start as usize);
 		next_app
 	}
 
 	pub fn run_next_at_boot(&self, next_app: usize) -> !{
+		ARCH.set_next_timer_intr(TICK_MS); //TODO: 参数化
 		// init user stack and sret
 		unsafe {
 			boot_entry(next_app)

@@ -27,8 +27,13 @@ pub trait ArchPower {
 }
 
 pub trait ArchTime {
-	fn sleep(&self, sec: i32);
+	fn sleep(&self, sec: usize);
+	fn enable_timer(&self);
 	fn time_ns(&self) -> usize;
+	fn time_us(&self) -> usize;
+	fn time_ms(&self) -> usize;
+	fn time_s(&self) -> usize;
+	fn set_next_timer_intr(&self, dur_ms: usize);
 }
 
 pub trait ArchHarts {

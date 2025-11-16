@@ -1,13 +1,15 @@
 use crate::TASK_MANAGER;
+use crate::config::TICK_MS;
+use crate::global::ARCH;
+use crate::arch::common::ArchTime;
 use crate::syscall::syscall;
 use crate::syscall::syscallid::SyscallID;
 use crate::trap::entire::EntireContext;
 use crate::trap::entire::EntireResult;
 use crate::trap::fast::FastResult;
 use crate::trap::fast::FastContext;
-use log::debug;
-use log::info;
 use log::warn;
+use riscv::interrupt::Interrupt;
 use riscv::interrupt::supervisor::Exception;
 use riscv::register::sscratch;
 use riscv::register::{scause, stval};
@@ -32,6 +34,11 @@ pub extern "C" fn fast_handler(
     match scause.cause()
 	.try_into::<riscv::interrupt::Interrupt, riscv::interrupt::supervisor::Exception>()
 	.unwrap() {
+	
+	Trap::Interrupt(Interrupt::SupervisorTimer) => {
+		ARCH.set_next_timer_intr(TICK_MS);
+		ctx.continue_with(timer_handler, ())
+	}
 
 	Trap::Exception(Exception::UserEnvCall) => {
 		save_regs(&mut ctx);
@@ -116,6 +123,14 @@ pub extern "C" fn yield_handler(ctx: EntireContext) -> EntireResult {
 	let mut split_ctx = ctx.split().0;
 	split_ctx.regs().set_sp(sscratch::read());
 	split_ctx.regs().set_pc(sepc::read() + 4);
+	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next();
+	EntireResult::Restore
+}
+
+pub extern "C" fn timer_handler(ctx: EntireContext) -> EntireResult {
+	let mut split_ctx = ctx.split().0;
+	split_ctx.regs().set_sp(sscratch::read());
+	split_ctx.regs().set_pc(sepc::read());
 	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next();
 	EntireResult::Restore
 }
