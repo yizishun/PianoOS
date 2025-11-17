@@ -36,7 +36,7 @@ pub extern "C" fn fast_handler(
 	.unwrap() {
 	
 	Trap::Interrupt(Interrupt::SupervisorTimer) => {
-		ARCH.set_next_timer_intr(TICK_MS);
+		save_regs(&mut ctx);
 		ctx.continue_with(timer_handler, ())
 	}
 
@@ -108,6 +108,7 @@ pub extern "C" fn syscall_handler(
 			ctx.continue_with(yield_handler, ())
 		},
 		SyscallID::Exit => {
+			TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
 			ctx.switch_to()
 		}
 		_ => {
@@ -131,6 +132,7 @@ pub extern "C" fn timer_handler(ctx: EntireContext) -> EntireResult {
 	let mut split_ctx = ctx.split().0;
 	split_ctx.regs().set_sp(sscratch::read());
 	split_ctx.regs().set_pc(sepc::read());
+	ARCH.set_next_timer_intr(TICK_MS);
 	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next();
 	EntireResult::Restore
 }

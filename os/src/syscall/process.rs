@@ -1,4 +1,3 @@
-use crate::global::TASK_MANAGER;
 use crate::harts::task_context_in_trap_stage;
 use crate::info;
 
@@ -7,7 +6,6 @@ pub fn sys_exit(xstate: i32) -> isize {
 		(*task_context_in_trap_stage().app_info.get()).end();
 	}
 	info!("Application exited with code {}", xstate);
-	TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
 	0
 }
 

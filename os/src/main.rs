@@ -42,6 +42,7 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	heap_init();
 
 	PLATFORM.call_once(|| Platform::init_platform(device_tree).unwrap());
+
 	PIANOLOGGER.call_once(|| { PianoLogger::set_boot_logger() });
 	logging::init().expect("Logging System init fail");
 	info!("Logging system init success");

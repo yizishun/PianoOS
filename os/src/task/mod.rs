@@ -137,7 +137,7 @@ impl TaskManager {
 	}
 
 	pub fn run_next_at_boot(&self, next_app: usize) -> !{
-		ARCH.set_next_timer_intr(TICK_MS); //TODO: 参数化
+		ARCH.set_next_timer_intr(TICK_MS);
 		// init user stack and sret
 		unsafe {
 			boot_entry(next_app)
@@ -164,7 +164,7 @@ impl TaskManager {
 		// init task context
 		unsafe {
 			next_task_context.app_info.get().as_mut().unwrap()
-				.start(next_app, next_app_range.clone());
+				.start(next_app, next_app_range.clone()); //TODO:只有第一次需要start
 		}
 
 		assert!(self.tasks[next_app].status() == TaskStatus::Running);
@@ -185,6 +185,7 @@ impl TaskManager {
 		let app_id = unsafe { task_context_in_trap_stage().app_info.get().as_ref().unwrap().cur_app };
 		let task_block = self.tasks.get(app_id).unwrap();
 		assert!(task_block.status() == TaskStatus::Running, "this task is not Running, something may be wrong");
+		info!("Release {}", app_id);
 		task_block.mark_suspend_low();
 		let next_app = self.run_next_at_trap();
 		assert!(self.tasks[next_app].status() == TaskStatus::Running);
