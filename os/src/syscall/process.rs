@@ -1,3 +1,5 @@
+use crate::arch::common::ArchTime;
+use crate::global::ARCH;
 use crate::harts::task_context_in_trap_stage;
 use crate::info;
 
@@ -13,4 +15,8 @@ pub fn sys_get_taskid() -> isize {
 	unsafe {
 		(*task_context_in_trap_stage().app_info.get()).cur_app as isize
 	}
+}
+
+pub fn sys_get_time() -> isize {
+	ARCH.time_ms() as isize
 }

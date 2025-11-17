@@ -2,6 +2,7 @@ pub mod syscallid;
 pub mod fs;
 pub mod process;
 
+use crate::syscall::process::sys_get_time;
 use crate::syscall::syscallid::SyscallID;
 use crate::syscall::fs::sys_write;
 use crate::syscall::process::sys_exit;
@@ -18,6 +19,9 @@ pub fn syscall(syscall_id: SyscallID, args: [usize; 3]) -> isize {
 		SyscallID::GetTaskID => {
 			sys_get_taskid() as isize
 		},
+		SyscallID::GetTime => {
+			sys_get_time()
+		}
 		_ => 0
 	}
 }
