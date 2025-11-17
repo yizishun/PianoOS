@@ -1,7 +1,7 @@
 ﻿use core::{mem::MaybeUninit, ptr::NonNull};
 use riscv::register::mstatus::set_fs;
 
-use crate::harts::HartContext;
+use crate::harts::{HartContext, task_context_in_trap_stage};
 use crate::task::block::TaskControlBlock;
 use crate::trap::TrapHandler;
 use crate::trap::entire::EntireHandler;
@@ -76,6 +76,9 @@ impl FastContext {
 	/// > **NOTICE** 必须先手工调用 `save_args`，或通过其他方式设置参数寄存器。
 	#[inline]
 	pub fn restore(self) -> FastResult {
+		let tctx = task_context_in_trap_stage();
+		tctx.app_info().kernel_time.end();
+		tctx.app_info().user_time.start();
 		FastResult::Restore
 	}
 

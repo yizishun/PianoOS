@@ -20,24 +20,24 @@ impl ArchTime for Riscv64<RiscvVirt> {
 		}
 	}
 
-	fn time_ns(&self) -> usize {
+	fn time_ns(&self) -> u64 {
 		let time = time::read64();
-		(time as usize * 1_000_000_000) / VIRT_FREQUNCY
+		(time * 1_000_000_000) / VIRT_FREQUNCY as u64
 	}
 
-	fn time_us(&self) -> usize {
+	fn time_us(&self) -> u64 {
 		let time = time::read64();
-		(time as usize * 1_000_000) / VIRT_FREQUNCY
+		(time * 1_000_000) / VIRT_FREQUNCY as u64
 	}
 
-	fn time_ms(&self) -> usize {
+	fn time_ms(&self) -> u64 {
 		let time = time::read64();
-		(time as usize * 1_000) / VIRT_FREQUNCY
+		(time * 1_000) / VIRT_FREQUNCY as u64
 	}
 
-	fn time_s(&self) -> usize {
+	fn time_s(&self) -> u64 {
 		let time = time::read64();
-		time as usize / VIRT_FREQUNCY
+		time / VIRT_FREQUNCY as u64
 	}
 
 	fn set_next_timer_intr(&self, dur_ms: usize) {

@@ -29,10 +29,10 @@ pub trait ArchPower {
 pub trait ArchTime {
 	fn sleep(&self, sec: usize);
 	fn enable_timer(&self);
-	fn time_ns(&self) -> usize;
-	fn time_us(&self) -> usize;
-	fn time_ms(&self) -> usize;
-	fn time_s(&self) -> usize;
+	fn time_ns(&self) -> u64;
+	fn time_us(&self) -> u64;
+	fn time_ms(&self) -> u64;
+	fn time_s(&self) -> u64;
 	fn set_next_timer_intr(&self, dur_ms: usize);
 }
 

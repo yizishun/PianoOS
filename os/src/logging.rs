@@ -86,7 +86,7 @@ impl Log for TrapLogger {
 		let bold = "\x1b[1;37m";
 		let hart_context = hart_context_in_trap_stage();
 		let hart_id = hart_context.hartid();
-		let app_id = unsafe { (*task_context_in_trap_stage().app_info.get()).cur_app };
+		let app_id = task_context_in_trap_stage().app_info().cur_app;
 		println!("{bold}[kernel]{reset}{color_log} {:<5}[{:>2}][{:>2}]{reset} - {}",
 			 record.level(),
 			 hart_id,
@@ -107,7 +107,7 @@ pub fn init() -> Result<(), SetLoggerError> {
 			      Some("TRACE") => LevelFilter::Trace,
 			      Some("DEBUG") => LevelFilter::Debug,
 			      Some("OFF") => LevelFilter::Off,
-			      None | _ => LevelFilter::Info,
+			      None | _ => LevelFilter::Trace,
 		      });
 	Ok(())
 }

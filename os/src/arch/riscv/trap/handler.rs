@@ -29,6 +29,8 @@ pub extern "C" fn fast_handler(
     let save_regs = |ctx: &mut FastContext| {
 	ctx.regs().a = [ctx.a0(), a1, a2, a3, a4, a5, a6, a7];
     };
+    ctx.tasks().app_info().user_time.end();
+    ctx.tasks().app_info().kernel_time.start();
     let scause = scause::read();
     let stval = stval::read();
     match scause.cause()
@@ -48,9 +50,6 @@ pub extern "C" fn fast_handler(
 	Trap::Exception(Exception::StorePageFault) |
 	Trap::Exception(Exception::LoadFault) | 
 	Trap::Exception(Exception::LoadMisaligned) => {
-		unsafe {
-			(*ctx.tasks().app_info.get()).end();
-		}
 		warn!("PageFault in application, kernel killed it.");
 		warn!("Illegal addr: 0x{:x}", stval);
 		warn!("excption pc: 0x{:x}", sepc::read());
@@ -58,9 +57,6 @@ pub extern "C" fn fast_handler(
 		ctx.switch_to()
 	}
 	Trap::Exception(Exception::IllegalInstruction) => {
-		unsafe {
-			(*ctx.tasks().app_info.get()).end();
-		}
 		warn!("IllegalInstruction in application, kernel killed it.");
 		warn!("excption pc: 0x{:x}", sepc::read());
 		TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
@@ -69,12 +65,10 @@ pub extern "C" fn fast_handler(
 	Trap::Exception(Exception::InstructionFault) |
 	Trap::Exception(Exception::InstructionMisaligned) |
 	Trap::Exception(Exception::InstructionPageFault) => {
-		unsafe {
-			(*ctx.tasks().app_info.get()).end();
-		}
 		warn!("Instruction PageFault in application, kernel killed it.");
 		warn!("Illegal addr: 0x{:x}", stval);
 		warn!("excption pc: 0x{:x}", sepc::read());
+		ctx.tasks().app_info().end();
 		TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
 		ctx.switch_to()
 	}
@@ -97,7 +91,7 @@ pub extern "C" fn syscall_handler(
 ) -> FastResult {
 	let syscall_id: SyscallID = a7.try_into().unwrap();
 	let tasks = ctx.tasks();
-	let app_info = unsafe { tasks.app_info.get().as_mut().unwrap() };
+	let app_info = tasks.app_info();
 
 	*app_info.syscall_record.get_mut(&syscall_id).unwrap() += 1;
 
@@ -125,7 +119,7 @@ pub extern "C" fn yield_handler(ctx: EntireContext) -> EntireResult {
 	split_ctx.regs().set_sp(sscratch::read());
 	split_ctx.regs().set_pc(sepc::read() + 4);
 	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next();
-	EntireResult::Restore
+	split_ctx.restore()
 }
 
 pub extern "C" fn timer_handler(ctx: EntireContext) -> EntireResult {
@@ -134,5 +128,5 @@ pub extern "C" fn timer_handler(ctx: EntireContext) -> EntireResult {
 	split_ctx.regs().set_pc(sepc::read());
 	ARCH.set_next_timer_intr(TICK_MS);
 	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next();
-	EntireResult::Restore
+	split_ctx.restore()
 }

@@ -11,18 +11,24 @@ pub struct TaskControlBlock {
 	// SAFETY: one flow_context will only bind to one harts
 	pub flow_context: SyncUnsafeCell<FlowContext>,
 	pub task_status: AtomicU8,
-	pub app_info: SyncUnsafeCell<AppHartInfo>
+	app_info: SyncUnsafeCell<AppHartInfo>
 }
 
 impl TaskControlBlock {
-	pub fn new(app_id: usize, start_addr: usize, status: TaskStatus) -> Self {
+	pub fn new(app_id: usize, start_addr: usize, end_addr: usize, status: TaskStatus) -> Self {
 		let task_status = AtomicU8::new(u8::from(status));
-		let app_info = SyncUnsafeCell::new(AppHartInfo::new(app_id));
+		let app_info = SyncUnsafeCell::new(AppHartInfo::new(app_id, start_addr, end_addr));
 		let flow_context= SyncUnsafeCell::new(FlowContext::new(app_id, start_addr));
 		Self {
 			flow_context,
 			task_status, 
 			app_info
+		}
+	}
+
+	pub fn app_info(&self) -> &mut AppHartInfo {
+		unsafe {
+			&mut (*self.app_info.get())
 		}
 	}
 

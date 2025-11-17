@@ -10,36 +10,27 @@ use log::trace;
 pub struct AppHartInfo {
 	pub cur_app: usize,
 	pub syscall_record: BTreeMap<SyscallID, usize>,
-	pub start_time: usize,
-	pub end_time: usize,
-	pub app_range: Range<*const u8>
+	pub app_range: Range<*const u8>,
+	pub kernel_time: StopWatch,
+	pub user_time: StopWatch,
 }
 
 impl AppHartInfo {
-	pub fn new(app_id: usize) -> Self {
+	pub fn new(app_id: usize, start_addr: usize, end_addr: usize) -> Self {
 		let mut record = BTreeMap::new();
 		for syscall in SyscallID::iter() {
 			record.insert(syscall, 0);
 		}
-		AppHartInfo { 
+		AppHartInfo {
 			cur_app: app_id, 
 			syscall_record: record,
-			start_time: 0,
-			end_time: 0,
-			app_range: null()..null()
+			app_range: start_addr as *const u8..end_addr as *const u8,
+			kernel_time: StopWatch::new(),
+			user_time: StopWatch::new(),
 		}
 	}
 
-	pub fn start(&mut self, cur_app: usize, app_range: Range<*const u8>) {
-		//self.cur_app = cur_app;
-		assert!(cur_app == self.cur_app);
-		self.clear_syscall_record();
-		self.start_time = ARCH.time_ns();
-		self.app_range = app_range;
-	}
-
 	pub fn end(&mut self) {
-		self.end_time = ARCH.time_ns();
 		self.print_app_statistics();
 	}
 
@@ -47,9 +38,8 @@ impl AppHartInfo {
 		trace!("==== App({}) statistics ====", self.cur_app);
 		trace!("Start addr: 0x{:x}", self.app_range.start as usize);
 		trace!("End addr  : 0x{:x}", self.app_range.end as usize);
-		trace!("Start time: {}ns", self.start_time);
-		trace!("End time  : {}ns", self.end_time);
-		trace!("Total time: {}ns", self.end_time - self.start_time);
+		trace!("Kernel total time: {}ns", self.kernel_time.time());
+		trace!("User total time: {}ns", self.user_time.time());
 		trace!("Syscall statistics --");
 		self.print_syscall_record();
 		trace!("== App({}) statistics end ==", self.cur_app);
@@ -65,5 +55,38 @@ impl AppHartInfo {
 		for syscall in SyscallID::iter() {
 			*self.syscall_record.get_mut(&syscall).unwrap() = 0;
 		}
+	}
+}
+
+pub struct StopWatch {
+	total_time: u64, //ns
+	timing: bool,
+	start_time: u64,
+}
+
+impl StopWatch {
+	pub fn new() -> Self {
+		Self { 
+			total_time: 0,
+			timing: false,
+			start_time: 0,
+		}
+	}
+
+	pub fn time(&self) -> u64 {
+		self.total_time
+	}
+
+	pub fn start(&mut self) {
+		assert_eq!(self.timing, false, "Stop Watch already start");
+		self.timing = true;
+		self.start_time = ARCH.time_ns();
+	}
+
+	pub fn end(&mut self) {
+		assert_eq!(self.timing, true, "Stop Watch have not start");
+		self.timing = false;
+		let end_time = ARCH.time_ns();
+		self.total_time += (end_time - self.start_time);
 	}
 }

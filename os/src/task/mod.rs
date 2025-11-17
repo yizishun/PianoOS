@@ -44,9 +44,13 @@ impl TaskManager {
 		let tasks: [TaskControlBlock; MAX_APP_NUM] = 
 			array::from_fn(|i| {
 				if i < num_app {
-					TaskControlBlock::new(i, app_range[i].start as usize, TaskStatus::Ready(ReadyLevel::High))
+					TaskControlBlock::new(
+						i, 
+						app_range[i].start as usize, 
+						app_range[i].end as usize,
+						TaskStatus::Ready(ReadyLevel::High))
 				} else {
-					TaskControlBlock::new(i, app_range[i].start as usize, TaskStatus::Exited)
+					TaskControlBlock::new(i, 0, 0, TaskStatus::Exited)
 				}
 			});
 		TaskManager { 
@@ -73,11 +77,6 @@ impl TaskManager {
 			info!("All applications completed! Kennel shutdown");
 			*lock = true;
 			ARCH.shutdown(false);
-		} else {
-			//info!("Waiting other program finished");
-			//self.finished.iter().take(self.num_app).enumerate().for_each(|e| {
-				//info!("program({:?}) finished: {:?}", e.0, e.1);
-			//});
 		}
 	}
 
@@ -126,11 +125,6 @@ impl TaskManager {
 			KERNEL_STACK.get_mut(hartid).unwrap()
 				.load_as_stack(hartid, next_flow_context);	
 		}
-		// init task context
-		unsafe {
-			next_task_context.app_info.get().as_mut().unwrap()
-				.start(next_app, next_app_range.clone());
-		}
 		// init sepc, sstatus, stvec, stie
 		boot_handler(next_app_range.start as usize);
 		next_app
@@ -138,6 +132,7 @@ impl TaskManager {
 
 	pub fn run_next_at_boot(&self, next_app: usize) -> !{
 		ARCH.set_next_timer_intr(TICK_MS);
+		self.tasks.get(next_app).unwrap().app_info().user_time.start();
 		// init user stack and sret
 		unsafe {
 			boot_entry(next_app)
@@ -149,7 +144,6 @@ impl TaskManager {
 		assert!(self.tasks[next_app].status() == TaskStatus::Running);
 		let next_task_context = &self.tasks[next_app];
 		let next_flow_context = next_task_context.flow_context.get() as *mut FlowContext;
-		let next_app_range = &self.app_range[next_app];
 		let trap_handler = trap_handler_in_trap_stage();
 
 		//set sepc, sscratch(user stack)
@@ -161,37 +155,42 @@ impl TaskManager {
 		// switch task context
 		trap_handler.context = unsafe { NonNull::new_unchecked(next_flow_context) };
 
-		// init task context
-		unsafe {
-			next_task_context.app_info.get().as_mut().unwrap()
-				.start(next_app, next_app_range.clone()); //TODO:只有第一次需要start
-		}
-
 		assert!(self.tasks[next_app].status() == TaskStatus::Running);
 		next_app
 	}
 
 	pub fn exit_cur_and_run_next(&self) {
-		let app_id = unsafe { task_context_in_trap_stage().app_info.get().as_ref().unwrap().cur_app };
-		let task_block = self.tasks.get(app_id).unwrap();
-		assert!(task_block.status() == TaskStatus::Running, "this task is not Running, something may be wrong");
-		task_block.mark_exit();
+		let app_id = task_context_in_trap_stage().app_info().cur_app;
+		let old_task_block = self.tasks.get(app_id).unwrap();
+		assert!(old_task_block.status() == TaskStatus::Running, "this task is not Running, something may be wrong");
+		old_task_block.app_info().kernel_time.end();
+		old_task_block.app_info().end();
+		old_task_block.mark_exit();
+
 		let next_app = self.run_next_at_trap();
-		assert!(self.tasks[next_app].status() == TaskStatus::Running);
+
+		let new_task_block = &self.tasks[next_app];
+		new_task_block.app_info().user_time.start();
+		assert!(new_task_block.status() == TaskStatus::Running);
 		info!("Kernel end {} and switch to app {}", app_id, next_app);
 	}
 
 	pub fn suspend_cur_and_run_next(&self) {
-		let app_id = unsafe { task_context_in_trap_stage().app_info.get().as_ref().unwrap().cur_app };
-		let task_block = self.tasks.get(app_id).unwrap();
-		assert!(task_block.status() == TaskStatus::Running, "this task is not Running, something may be wrong");
+		let app_id = task_context_in_trap_stage().app_info().cur_app;
+		let old_task_block = self.tasks.get(app_id).unwrap();
+		assert!(old_task_block.status() == TaskStatus::Running, "this task is not Running, something may be wrong");
+		old_task_block.app_info().kernel_time.end();
 		info!("Release {}", app_id);
-		task_block.mark_suspend_low();
+
+		old_task_block.mark_suspend_low();
 		let next_app = self.run_next_at_trap();
-		assert!(self.tasks[next_app].status() == TaskStatus::Running);
 		if next_app != app_id {
-			task_block.mark_suspend_high_cas(TaskStatus::Ready(ReadyLevel::Low));
+			old_task_block.mark_suspend_high_cas(TaskStatus::Ready(ReadyLevel::Low));
 		}
+
+		let new_task_block = &self.tasks[next_app];
+		new_task_block.app_info().user_time.start();
+		assert!(new_task_block.status() == TaskStatus::Running);
 		info!("Kernel suspend {} switch to app {}", app_id, next_app);
 	}
 }
