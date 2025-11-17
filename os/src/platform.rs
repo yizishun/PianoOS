@@ -18,13 +18,17 @@ pub type BaseAddr = usize;
 
 pub struct BoardInfo {
 	pub cpu_num: Option<usize>,
+	pub cpu_freq: Option<usize>,
 	pub console: Option<(BaseAddr, ConsoleType)>,
 }
 
 impl BoardInfo {
 	pub const fn new() -> BoardInfo {
-		BoardInfo { cpu_num: None,
-			    console: None }
+		BoardInfo { 
+			cpu_num: None,
+			cpu_freq: None,
+			console: None
+		}
 	}
 }
 
@@ -67,6 +71,7 @@ impl Platform {
 	fn init_board_info(tree: &Tree, root: &Node) -> Result<BoardInfo, ParseDeviceTreeError> {
 		let mut board_info = BoardInfo::new();
 		board_info.cpu_num = Some(tree.cpus.cpu.len());
+		board_info.cpu_freq = Some(tree.cpus.timebase_frequency as usize);
 		board_info.console = Self::init_console_info(root)?;
 		Ok(board_info)
 	}
@@ -108,6 +113,7 @@ impl Platform {
 
 	pub fn print_platform_info(&self) {
 		info!("cpu number: {}", self.board_info.cpu_num.unwrap());
+		info!("cpu freq: {}", self.board_info.cpu_freq.unwrap());
 		info!("uart type is {:#?}, base addr is 0x{:X}",
 		      self.board_info.console.unwrap().1,
 		      self.board_info.console.unwrap().0)

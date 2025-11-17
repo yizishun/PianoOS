@@ -17,6 +17,10 @@ pub struct AllArg {
 	#[arg(long, default_value_t = false)]
     	pub release: bool,
 
+	//kernel args
+	#[arg(long, short = 'f')]
+    	pub features: Vec<String>,
+
 	//qemu args
 	#[arg(long, default_value_t = 1)]
 	pub smp: usize,
@@ -63,7 +67,8 @@ pub fn run(arg: &AllArg) -> Option<ExitStatus> {
 
 	let karg = KernelArg { 
 		target: arg.target.clone(),
-		release
+		release,
+		features: arg.features.clone()
 	};
 	info!("Building Kernel");
 	let k_status = kernel::run(&karg)?;

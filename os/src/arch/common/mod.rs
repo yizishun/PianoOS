@@ -43,12 +43,10 @@ pub trait ArchHarts {
 
 pub trait ArchTrap {
 	unsafe fn load_direct_trap_entry(&self);
-	unsafe fn set_next_pc(&self, addr: usize);
-	unsafe fn set_next_user_stack(&self, addr: usize);
 }
 
 #[cfg(target_arch = "riscv64")]
-pub type Arch = Riscv64<RiscvVirt>; //TODO: 这个RiscvVirt只是默认
+pub type Arch = Riscv64<RiscvCommon>;
 
 #[cfg(target_arch = "riscv64")]
 pub use crate::arch::riscv::trap::FlowContext as FlowContext;

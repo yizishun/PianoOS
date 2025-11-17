@@ -13,21 +13,7 @@ impl<C> ArchTrap for Riscv64<C> {
 	#[inline]
 	unsafe fn load_direct_trap_entry(&self) {
 		unsafe {
-		    stvec::write(Stvec::new(trap_entry as usize, stvec::TrapMode::Direct));
-		}
-	}
-
-	#[inline]
-	unsafe fn set_next_pc(&self, addr: usize) {
-		unsafe {
-			sepc::write(addr);
-		}
-	}
-
-	#[inline]
-	unsafe fn set_next_user_stack(&self, addr: usize) {
-		unsafe {
-			sscratch::write(addr);
+		    stvec::write(Stvec::new(trap_entry as *const() as usize, stvec::TrapMode::Direct));
 		}
 	}
 }
@@ -72,6 +58,45 @@ macro_rules! load {
 	};
 }
 
+#[cfg(feature = "float")]
+macro_rules! fsave {
+	($reg:ident => $ptr:ident[$pos:expr]) => {
+		concat!("fsd ",
+			stringify!($reg),
+			", 8*",
+			$pos,
+			'(',
+			stringify!($ptr),
+			')')
+	};
+}
+#[cfg(not(feature = "float"))]
+macro_rules! fsave {
+	($reg:ident => $ptr:ident[$pos:expr]) => {
+		""
+	};
+}
+
+#[cfg(feature = "float")]
+macro_rules! fload {
+	($ptr:ident[$pos:expr] => $reg:ident) => {
+		concat!("fld ",
+			stringify!($reg),
+			", 8*",
+			$pos,
+			'(',
+			stringify!($ptr),
+			')')
+	};
+}
+#[cfg(not(feature = "float"))]
+macro_rules! fload {
+	($ptr:ident[$pos:expr] => $reg:ident) => {
+		""
+	};
+	
+}
+
 #[repr(C)]
 pub struct FlowContext {
 	pub ra: usize,      // 0..
@@ -82,6 +107,8 @@ pub struct FlowContext {
 	pub tp: usize,      // 29..
 	pub sp: usize,      // 30..
 	pub pc: usize,      // 31..
+	#[cfg(feature = "float")]
+	pub f:  [usize; 32] // 32..
 }
 
 impl FlowContext {
@@ -93,7 +120,9 @@ impl FlowContext {
 		gp: 0,
 		tp: 0,
 		sp: 0,
-		pc: 0
+		pc: 0,
+		#[cfg(feature = "float")]
+		f: [0; 32],
 	};
 
 	pub fn new(app_id: usize, start_addr: usize) -> Self {
@@ -110,7 +139,9 @@ impl FlowContext {
 			gp: 0,
 			tp: 0,
 			sp: user_stack + USER_STACK_SIZE,
-			pc: start_addr
+			pc: start_addr,
+			#[cfg(feature = "float")]
+			f: [0; 32]
 		}
 	}
 
@@ -210,6 +241,39 @@ pub unsafe extern "C" fn trap_entry() {
 		save!(s10 => a1[26]),
 		save!(s11 => a1[27]),
 		save!(gp  => a1[28]),
+
+		fsave!(f0 =>  a2[32]),
+		fsave!(f1 =>  a2[33]),
+		fsave!(f2 =>  a2[34]),
+		fsave!(f3 =>  a2[35]),
+		fsave!(f4 =>  a2[36]),
+		fsave!(f5 =>  a2[37]),
+		fsave!(f6 =>  a2[38]),
+		fsave!(f7 =>  a2[39]),
+		fsave!(f8 =>  a2[40]),
+		fsave!(f9 =>  a2[41]),
+		fsave!(f10 => a2[42]),
+		fsave!(f11 => a2[43]),
+		fsave!(f12 => a2[44]),
+		fsave!(f13 => a2[45]),
+		fsave!(f14 => a2[46]),
+		fsave!(f15 => a2[47]),
+		fsave!(f16 => a2[48]),
+		fsave!(f17 => a2[49]),
+		fsave!(f18 => a2[50]),
+		fsave!(f19 => a2[51]),
+		fsave!(f20 => a2[52]),
+		fsave!(f21 => a2[53]),
+		fsave!(f22 => a2[54]),
+		fsave!(f23 => a2[55]),
+		fsave!(f24 => a2[56]),
+		fsave!(f25 => a2[57]),
+		fsave!(f26 => a2[58]),
+		fsave!(f27 => a2[59]),
+		fsave!(f28 => a2[60]),
+		fsave!(f29 => a2[61]),
+		fsave!(f30 => a2[62]),
+		fsave!(f31 => a2[63]),
 		// 调用完整路径函数
 		//
 		// | reg    | position
@@ -240,6 +304,39 @@ pub unsafe extern "C" fn trap_entry() {
 		load!(a1[26] => s10),
 		load!(a1[27] => s11),
 		load!(a1[28] => gp),
+
+		fload!(a1[32] => f0),
+		fload!(a1[33] => f1),
+		fload!(a1[34] => f2),
+		fload!(a1[35] => f3),
+		fload!(a1[36] => f4),
+		fload!(a1[37] => f5),
+		fload!(a1[38] => f6),
+		fload!(a1[39] => f7),
+		fload!(a1[40] => f8),
+		fload!(a1[41] => f9),
+		fload!(a1[42] => f10),
+		fload!(a1[43] => f11),
+		fload!(a1[44] => f12),
+		fload!(a1[45] => f13),
+		fload!(a1[46] => f14),
+		fload!(a1[47] => f15),
+		fload!(a1[48] => f16),
+		fload!(a1[49] => f17),
+		fload!(a1[50] => f18),
+		fload!(a1[51] => f19),
+		fload!(a1[52] => f20),
+		fload!(a1[53] => f21),
+		fload!(a1[54] => f22),
+		fload!(a1[55] => f23),
+		fload!(a1[56] => f24),
+		fload!(a1[57] => f25),
+		fload!(a1[58] => f26),
+		fload!(a1[59] => f27),
+		fload!(a1[60] => f28),
+		fload!(a1[61] => f29),
+		fload!(a1[62] => f30),
+		fload!(a1[63] => f31),
 		"2:", // 设置所有调用者寄存器
 		load!(a1[ 0] => ra),
 		load!(a1[ 1] => t0),

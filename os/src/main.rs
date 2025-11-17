@@ -5,6 +5,8 @@
 #![feature(core_intrinsics)]
 #![feature(generic_atomic)]
 #![feature(sync_unsafe_cell)]
+#![feature(min_specialization)]
+#![feature(stmt_expr_attributes)]
 
 use log::info;
 

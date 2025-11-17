@@ -7,7 +7,9 @@ pub mod harts;
 
 use core::marker::PhantomData;
 
-pub struct RiscvVirt;
+// common会使用设备树解析的结果
+pub struct RiscvCommon;
+pub struct RiscvVirt; //可以对某些platform做特殊的优化，比如硬编码某些东西
 
 pub struct Riscv64<C>(PhantomData<C>);
 

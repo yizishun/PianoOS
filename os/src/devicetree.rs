@@ -20,6 +20,7 @@ pub struct Tree<'a> {
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Cpus<'a> {
+	pub timebase_frequency: u32,
 	/// Sequence of CPU nodes.
 	pub cpu: NodeSeq<'a>,
 }
@@ -27,7 +28,8 @@ pub struct Cpus<'a> {
 /// Individual CPU node information.
 #[derive(Deserialize, Debug)]
 #[allow(unused)]
-pub struct Cpu {}
+pub struct Cpu {
+}
 
 /// Memory range.
 #[derive(Deserialize)]

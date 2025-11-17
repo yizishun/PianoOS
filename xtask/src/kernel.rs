@@ -14,6 +14,9 @@ pub struct KernelArg {
 
 	#[arg(long, default_value_t = false)]
     	pub release: bool,
+
+	#[arg(long, short = 'f', default_value = "float")]
+    	pub features: Vec<String>,
 }
 
 #[must_use]
@@ -48,6 +51,7 @@ fn build_kernel(arg: &KernelArg) -> Option<ExitStatus> {
 		.package(KERNEL_PACKAGE_NAME)
 		.target(arch)
 		.env("RUSTFLAGS", rustflags)
+		.features(&arg.features)
 		.release(release)
 		.status()
 		.ok()?;
