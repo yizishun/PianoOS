@@ -1,6 +1,7 @@
 use core::{arch::naked_asm, usize};
 use core::arch::asm;
 use riscv::register::sie;
+use riscv::register::sstatus::FS;
 use riscv::register::{sepc, sscratch, sstatus::{self, SPP}, stvec::{self, Stvec}};
 
 use crate::config::USER_STACK_SIZE;
@@ -242,38 +243,44 @@ pub unsafe extern "C" fn trap_entry() {
 		save!(s11 => a1[27]),
 		save!(gp  => a1[28]),
 
-		fsave!(f0 =>  a2[32]),
-		fsave!(f1 =>  a2[33]),
-		fsave!(f2 =>  a2[34]),
-		fsave!(f3 =>  a2[35]),
-		fsave!(f4 =>  a2[36]),
-		fsave!(f5 =>  a2[37]),
-		fsave!(f6 =>  a2[38]),
-		fsave!(f7 =>  a2[39]),
-		fsave!(f8 =>  a2[40]),
-		fsave!(f9 =>  a2[41]),
-		fsave!(f10 => a2[42]),
-		fsave!(f11 => a2[43]),
-		fsave!(f12 => a2[44]),
-		fsave!(f13 => a2[45]),
-		fsave!(f14 => a2[46]),
-		fsave!(f15 => a2[47]),
-		fsave!(f16 => a2[48]),
-		fsave!(f17 => a2[49]),
-		fsave!(f18 => a2[50]),
-		fsave!(f19 => a2[51]),
-		fsave!(f20 => a2[52]),
-		fsave!(f21 => a2[53]),
-		fsave!(f22 => a2[54]),
-		fsave!(f23 => a2[55]),
-		fsave!(f24 => a2[56]),
-		fsave!(f25 => a2[57]),
-		fsave!(f26 => a2[58]),
-		fsave!(f27 => a2[59]),
-		fsave!(f28 => a2[60]),
-		fsave!(f29 => a2[61]),
-		fsave!(f30 => a2[62]),
-		fsave!(f31 => a2[63]),
+		"csrr t0, sstatus",
+		"srli t0, t0, 13",
+		"andi t0, t0, 0b11", //FS
+		"li t1, 3",
+		"bne t0, t1, fs_not_dirty1", //if FS != Dirty, skip f reg save
+		fsave!(f0 =>  a1[32]),
+		fsave!(f1 =>  a1[33]),
+		fsave!(f2 =>  a1[34]),
+		fsave!(f3 =>  a1[35]),
+		fsave!(f4 =>  a1[36]),
+		fsave!(f5 =>  a1[37]),
+		fsave!(f6 =>  a1[38]),
+		fsave!(f7 =>  a1[39]),
+		fsave!(f8 =>  a1[40]),
+		fsave!(f9 =>  a1[41]),
+		fsave!(f10 => a1[42]),
+		fsave!(f11 => a1[43]),
+		fsave!(f12 => a1[44]),
+		fsave!(f13 => a1[45]),
+		fsave!(f14 => a1[46]),
+		fsave!(f15 => a1[47]),
+		fsave!(f16 => a1[48]),
+		fsave!(f17 => a1[49]),
+		fsave!(f18 => a1[50]),
+		fsave!(f19 => a1[51]),
+		fsave!(f20 => a1[52]),
+		fsave!(f21 => a1[53]),
+		fsave!(f22 => a1[54]),
+		fsave!(f23 => a1[55]),
+		fsave!(f24 => a1[56]),
+		fsave!(f25 => a1[57]),
+		fsave!(f26 => a1[58]),
+		fsave!(f27 => a1[59]),
+		fsave!(f28 => a1[60]),
+		fsave!(f29 => a1[61]),
+		fsave!(f30 => a1[62]),
+		fsave!(f31 => a1[63]),
+		"fs_not_dirty1:",
 		// 调用完整路径函数
 		//
 		// | reg    | position
@@ -337,6 +344,8 @@ pub unsafe extern "C" fn trap_entry() {
 		fload!(a1[61] => f29),
 		fload!(a1[62] => f30),
 		fload!(a1[63] => f31),
+		"li t0, (1 << 13)",
+		"csrc sstatus, t0", //csr clear FS dirty(11) to clean(10)
 		"2:", // 设置所有调用者寄存器
 		load!(a1[ 0] => ra),
 		load!(a1[ 1] => t0),
@@ -377,8 +386,9 @@ pub unsafe extern "C" fn boot_entry(a0: usize) -> ! {
 pub extern "C" fn boot_handler(start_addr: usize) {
 	unsafe {
 		sstatus::set_spp(SPP::User);
+		sstatus::set_fs(FS::Initial);
 		sepc::write(start_addr);
-		stvec::write(Stvec::new(trap_entry as usize, stvec::TrapMode::Direct));
+		stvec::write(Stvec::new(trap_entry as *const () as usize, stvec::TrapMode::Direct));
 		sie::set_stimer();
 	}
 }
