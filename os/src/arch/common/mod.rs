@@ -1,20 +1,11 @@
 use crate::arch::riscv::*;
+use crate::trap::fast::{ FastContext, FastResult };
 
 // kernel entry
 #[cfg(target_arch = "loongarch64")]
 pub use crate::arch::loongarch64::entry;
 #[cfg(target_arch = "riscv64")]
 pub use crate::arch::riscv::entry;
-
-// app boot enrty
-#[cfg(target_arch = "riscv64")]
-pub use crate::arch::riscv::trap::boot_entry;
-#[cfg(target_arch = "riscv64")]
-pub use crate::arch::riscv::trap::boot_handler;
-
-// fast handler
-#[cfg(target_arch = "riscv64")]
-pub use crate::arch::riscv::trap::handler::fast_handler;
 
 // some common behavior
 pub trait ArchMem {
@@ -43,6 +34,20 @@ pub trait ArchHarts {
 
 pub trait ArchTrap {
 	unsafe fn load_direct_trap_entry(&self);
+	extern "C" fn fast_handler(
+		ctx: FastContext,
+		a1: usize,
+		a2: usize,
+		a3: usize,
+		a4: usize,
+		a5: usize,
+		a6: usize,
+		a7: usize,
+	) -> FastResult;
+	// app boot entry
+	unsafe extern "C" fn boot_entry(a0: usize) -> !;
+	// app boot prepare
+	extern "C" fn boot_handler(start_addr: usize);
 }
 
 #[cfg(target_arch = "riscv64")]

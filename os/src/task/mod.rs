@@ -7,7 +7,7 @@ use log::info;
 use spin::mutex::Mutex;
 
 use crate::global::{ARCH, KERNEL_STACK, LOADER};
-use crate::arch::common::{ArchPower, ArchTime, FlowContext, boot_entry, boot_handler};
+use crate::arch::common::{Arch, ArchPower, ArchTime, ArchTrap, FlowContext};
 use crate::config::{MAX_APP_NUM, TICK_MS};
 use crate::harts::{task_context_in_trap_stage, trap_handler_in_trap_stage};
 use crate::task::block::TaskControlBlock;
@@ -126,7 +126,7 @@ impl TaskManager {
 				.load_as_stack(hartid, next_flow_context);	
 		}
 		// init sepc, sstatus, stvec, stie
-		boot_handler(next_app_range.start as usize);
+		<Arch as ArchTrap>::boot_handler(next_app_range.start as usize);
 		next_app
 	}
 
@@ -135,7 +135,7 @@ impl TaskManager {
 		self.tasks.get(next_app).unwrap().app_info().user_time.start();
 		// init user stack and sret
 		unsafe {
-			boot_entry(next_app)
+			<Arch as ArchTrap>::boot_entry(next_app)
 		}
 	}
 

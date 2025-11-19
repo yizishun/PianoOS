@@ -1,11 +1,11 @@
 use core::intrinsics::forget;
 use core::ptr::NonNull;
 
-use crate::arch::common::{ArchHarts, FlowContext};
+use crate::arch::common::{ArchHarts, ArchPower, ArchTrap, FlowContext};
 use crate::global::ARCH;
+use crate::arch::common::Arch;
 use crate::{harts::HartContext, config::{USER_STACK_SIZE, KERNEL_STACK_SIZE}};
 use crate::trap::{FreeTrapStack, TrapHandler};
-use crate::arch::common::fast_handler;
 
 // Make sure stack address can be aligned.
 const _: () = assert!(KERNEL_STACK_SIZE % align_of::<KernelStack>() == 0);
@@ -116,7 +116,7 @@ impl KernelStack {
 			|_| {}, 
 			context_ptr,
 			hart_ptr,
-			fast_handler
+			<Arch as ArchTrap>::fast_handler
 		).unwrap()
 	}
 
@@ -136,7 +136,7 @@ impl KernelStack {
 				|_| {}, 
 				context_ptr,
 				hart_ptr,
-				fast_handler
+				<Arch as ArchTrap>::fast_handler
 			).unwrap().load()
 		);
 	}

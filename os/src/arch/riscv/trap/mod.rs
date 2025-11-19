@@ -3,11 +3,23 @@ use core::arch::asm;
 use riscv::register::sie;
 use riscv::register::sstatus::FS;
 use riscv::register::{sepc, sscratch, sstatus::{self, SPP}, stvec::{self, Stvec}};
+use log::warn;
+use riscv::interrupt::Interrupt;
+use riscv::interrupt::supervisor::Exception;
+use riscv::register::{scause, stval};
+use riscv::register::mcause::Trap;
 
 use crate::config::USER_STACK_SIZE;
 use crate::{arch::{common::ArchTrap, riscv::Riscv64}};
 use crate::USER_STACK;
 use crate::mm::stack::UserStack;
+use crate::trap::fast::FastResult;
+use crate::trap::fast::FastContext;
+use crate::arch::riscv::trap::handler::{
+	timer_handler,
+	syscall_handler
+};
+use crate::TASK_MANAGER;
 pub mod handler;
 
 impl<C> ArchTrap for Riscv64<C> {
@@ -17,6 +29,93 @@ impl<C> ArchTrap for Riscv64<C> {
 		    stvec::write(Stvec::new(trap_entry as *const() as usize, stvec::TrapMode::Direct));
 		}
 	}
+
+	extern "C" fn fast_handler(
+		mut ctx: FastContext,
+		a1: usize,
+		a2: usize,
+		a3: usize,
+		a4: usize,
+		a5: usize,
+		a6: usize,
+		a7: usize,
+	) -> FastResult {
+		let save_regs = |ctx: &mut FastContext| {
+			ctx.regs().a = [ctx.a0(), a1, a2, a3, a4, a5, a6, a7];
+		};
+		ctx.tasks().app_info().user_time.end();
+		ctx.tasks().app_info().kernel_time.start();
+		let scause = scause::read();
+		let stval = stval::read();
+		match scause.cause()
+			.try_into::<riscv::interrupt::Interrupt, riscv::interrupt::supervisor::Exception>()
+			.unwrap() {
+			
+			Trap::Interrupt(Interrupt::SupervisorTimer) => {
+				save_regs(&mut ctx);
+				ctx.continue_with(timer_handler, ())
+			}
+
+			Trap::Exception(Exception::UserEnvCall) => {
+				save_regs(&mut ctx);
+				syscall_handler(ctx, a1, a2, a3, a4, a5, a6, a7)
+			}
+			Trap::Exception(Exception::StoreFault) |
+			Trap::Exception(Exception::StorePageFault) |
+			Trap::Exception(Exception::LoadFault) | 
+			Trap::Exception(Exception::LoadMisaligned) => {
+				warn!("PageFault in application, kernel killed it.");
+				warn!("Illegal addr: 0x{:x}", stval);
+				warn!("excption pc: 0x{:x}", sepc::read());
+				TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
+				ctx.switch_to()
+			}
+			Trap::Exception(Exception::IllegalInstruction) => {
+				warn!("IllegalInstruction in application, kernel killed it.");
+				warn!("excption pc: 0x{:x}", sepc::read());
+				TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
+				ctx.switch_to()
+			}
+			Trap::Exception(Exception::InstructionFault) |
+			Trap::Exception(Exception::InstructionMisaligned) |
+			Trap::Exception(Exception::InstructionPageFault) => {
+				warn!("Instruction PageFault in application, kernel killed it.");
+				warn!("Illegal addr: 0x{:x}", stval);
+				warn!("excption pc: 0x{:x}", sepc::read());
+				ctx.tasks().app_info().end();
+				TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
+				ctx.switch_to()
+			}
+
+			_ => {
+				panic!("Unsupported trap {:?}, stval = {:#x}!", scause.cause(), stval);
+			}
+		}
+	}
+
+	#[unsafe(naked)]
+	unsafe extern "C" fn boot_entry(a0: usize) -> ! {
+		naked_asm!(
+			".align 2",
+			// sscratch is set in load_as_stack in main
+			"call {locate}",
+			"sret",
+			locate = sym locate_user_stack
+
+		)
+	}
+
+	extern "C" fn boot_handler(start_addr: usize) {
+		unsafe {
+			sstatus::set_spp(SPP::User);
+			sstatus::set_fs(FS::Initial);
+			sepc::write(start_addr);
+			stvec::write(Stvec::new(trap_entry as *const () as usize, stvec::TrapMode::Direct));
+			sie::set_stimer();
+		}
+}
+
+
 }
 
 macro_rules! exchange {
@@ -369,28 +468,6 @@ pub unsafe extern "C" fn trap_entry() {
 		exchange!(),
 		r#return!(),
 	)
-}
-
-#[unsafe(naked)]
-pub unsafe extern "C" fn boot_entry(a0: usize) -> ! {
-	naked_asm!(
-		".align 2",
-		// sscratch is set in load_as_stack in main
-		"call {locate}",
-		"sret",
-		locate = sym locate_user_stack
-
-	)
-}
-
-pub extern "C" fn boot_handler(start_addr: usize) {
-	unsafe {
-		sstatus::set_spp(SPP::User);
-		sstatus::set_fs(FS::Initial);
-		sepc::write(start_addr);
-		stvec::write(Stvec::new(trap_entry as *const () as usize, stvec::TrapMode::Direct));
-		sie::set_stimer();
-	}
 }
 
 /// Locates and initializes user stack for each hart.
