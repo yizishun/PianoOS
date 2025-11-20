@@ -3,23 +3,15 @@ use core::arch::asm;
 use riscv::register::sie;
 use riscv::register::sstatus::FS;
 use riscv::register::{sepc, sscratch, sstatus::{self, SPP}, stvec::{self, Stvec}};
-use log::warn;
-use riscv::interrupt::Interrupt;
-use riscv::interrupt::supervisor::Exception;
-use riscv::register::{scause, stval};
-use riscv::register::mcause::Trap;
-
+use log::{info, warn};
 use crate::config::USER_STACK_SIZE;
+use crate::harts::task_context_in_trap_stage;
 use crate::{arch::{common::ArchTrap, riscv::Riscv64}};
 use crate::USER_STACK;
 use crate::mm::stack::UserStack;
 use crate::trap::fast::FastResult;
 use crate::trap::fast::FastContext;
-use crate::arch::riscv::trap::handler::{
-	timer_handler,
-	syscall_handler
-};
-use crate::TASK_MANAGER;
+use crate::trap::LoadedTrapStack;
 pub mod handler;
 
 impl<C> ArchTrap for Riscv64<C> {
@@ -30,8 +22,8 @@ impl<C> ArchTrap for Riscv64<C> {
 		}
 	}
 
-	extern "C" fn fast_handler(
-		mut ctx: FastContext,
+	extern "C" fn fast_handler_user(
+		ctx: FastContext,
 		a1: usize,
 		a2: usize,
 		a3: usize,
@@ -40,57 +32,31 @@ impl<C> ArchTrap for Riscv64<C> {
 		a6: usize,
 		a7: usize,
 	) -> FastResult {
-		let save_regs = |ctx: &mut FastContext| {
-			ctx.regs().a = [ctx.a0(), a1, a2, a3, a4, a5, a6, a7];
-		};
-		ctx.tasks().app_info().user_time.end();
-		ctx.tasks().app_info().kernel_time.start();
-		let scause = scause::read();
-		let stval = stval::read();
-		match scause.cause()
-			.try_into::<riscv::interrupt::Interrupt, riscv::interrupt::supervisor::Exception>()
-			.unwrap() {
-			
-			Trap::Interrupt(Interrupt::SupervisorTimer) => {
-				save_regs(&mut ctx);
-				ctx.continue_with(timer_handler, ())
-			}
-
-			Trap::Exception(Exception::UserEnvCall) => {
-				save_regs(&mut ctx);
-				syscall_handler(ctx, a1, a2, a3, a4, a5, a6, a7)
-			}
-			Trap::Exception(Exception::StoreFault) |
-			Trap::Exception(Exception::StorePageFault) |
-			Trap::Exception(Exception::LoadFault) | 
-			Trap::Exception(Exception::LoadMisaligned) => {
-				warn!("PageFault in application, kernel killed it.");
-				warn!("Illegal addr: 0x{:x}", stval);
-				warn!("excption pc: 0x{:x}", sepc::read());
-				TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
-				ctx.switch_to()
-			}
-			Trap::Exception(Exception::IllegalInstruction) => {
-				warn!("IllegalInstruction in application, kernel killed it.");
-				warn!("excption pc: 0x{:x}", sepc::read());
-				TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
-				ctx.switch_to()
-			}
-			Trap::Exception(Exception::InstructionFault) |
-			Trap::Exception(Exception::InstructionMisaligned) |
-			Trap::Exception(Exception::InstructionPageFault) => {
-				warn!("Instruction PageFault in application, kernel killed it.");
-				warn!("Illegal addr: 0x{:x}", stval);
-				warn!("excption pc: 0x{:x}", sepc::read());
-				ctx.tasks().app_info().end();
-				TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
-				ctx.switch_to()
-			}
-
-			_ => {
-				panic!("Unsupported trap {:?}, stval = {:#x}!", scause.cause(), stval);
-			}
+		let result = handler::fast_handler_user(ctx, a1, a2, a3, a4, a5, a6, a7);
+		match result {
+		    FastResult::Call|
+		    FastResult::FastCall |
+		    FastResult::Switch => 
+		    	trap_end(true),
+		    FastResult::Restore => 
+		    	trap_end(false),
+		    FastResult::Continue => ()
 		}
+		result
+	}
+
+	extern "C" fn fast_handler_kernel(
+		ctx: FastContext,
+		a1: usize,
+		a2: usize,
+		a3: usize,
+		a4: usize,
+		a5: usize,
+		a6: usize,
+		a7: usize,
+	) -> FastResult {
+		let result = handler::fast_handler_kernel(ctx, a1, a2, a3, a4, a5, a6, a7);
+		result
 	}
 
 	#[unsafe(naked)]
@@ -113,9 +79,7 @@ impl<C> ArchTrap for Riscv64<C> {
 			stvec::write(Stvec::new(trap_entry as *const () as usize, stvec::TrapMode::Direct));
 			sie::set_stimer();
 		}
-}
-
-
+	}
 }
 
 macro_rules! exchange {
@@ -192,6 +156,40 @@ macro_rules! fload {
 #[cfg(not(feature = "float"))]
 macro_rules! fload {
 	($ptr:ident[$pos:expr] => $reg:ident) => {
+		""
+	};
+	
+}
+
+//TODO:其实不能将他和nested trap feature绑定
+#[cfg(feature = "nested_trap")]
+macro_rules! csr_save {
+	($csr:ident => $tmp:ident => $ptr:ident[$pos:expr]) => {
+		concat!(
+			"csrr ", stringify!($tmp), ", ", stringify!($csr), "\n\t",
+			"sd ", stringify!($tmp), ", 8*", stringify!($pos), "(", stringify!($ptr), ")"
+		)
+	};
+}
+#[cfg(not(feature = "nested_trap"))]
+macro_rules! csr_save {
+	($csr:ident => $tmp:ident => $ptr:ident[$pos:expr]) => {
+		""
+	};
+}
+#[cfg(feature = "nested_trap")]
+macro_rules! csr_load {
+    ($ptr:ident[$pos:expr] => $tmp:ident => $csr:ident) => {
+        concat!(
+            "ld ", stringify!($tmp), ", 8*", stringify!($pos),
+            "(", stringify!($ptr), ")\n\t",
+            "csrw ", stringify!($csr), ", ", stringify!($tmp)
+        )
+    };
+}
+#[cfg(not(feature = "nested_trap"))]
+macro_rules! csr_load {
+    	($ptr:ident[$pos:expr] => $tmp:ident => $csr:ident) => {
 		""
 	};
 	
@@ -290,6 +288,7 @@ pub unsafe extern "C" fn trap_entry() {
 		save!(t5 => a0[6]),
 		save!(t6 => a0[7]),
 		save!(tp => a0[29]), //tp存放原sscratch值，在整个trap过程有效
+		csr_save!(sscratch => t0 => a0[30]), //如果要支持嵌套trap，需要保存可能被破坏的sscratch
 		// 调用快速路径函数
 		//
 		// | reg    | position
@@ -463,6 +462,7 @@ pub unsafe extern "C" fn trap_entry() {
 		load!(a1[14] => a6),
 		load!(a1[15] => a7),
 		"0:", // 设置少量参数寄存器
+		csr_load!(a1[30] => a0 => sscratch),
 		load!(a1[ 8] => a0),
 		load!(a1[ 9] => a1),
 		exchange!(),
@@ -488,4 +488,20 @@ pub(crate) unsafe extern "C" fn locate_user_stack() {
 	per_hart_stack_size = const crate::config::USER_STACK_SIZE,
 	stack               =   sym crate::USER_STACK,
     )
+}
+
+
+// some commmon bavaior in the end of trap
+pub extern "C" fn trap_end(switch: bool) {
+	if !switch {
+		task_context_in_trap_stage().app_info().kernel_time.end();
+	}
+	task_context_in_trap_stage().app_info().user_time.start();
+	#[cfg(feature = "nested_trap")]
+	unsafe {
+		sstatus::clear_sie();
+		//TODO: 这样太粗糙
+		let load = LoadedTrapStack::get(0);
+		drop(load)
+	}
 }

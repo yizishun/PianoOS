@@ -78,6 +78,10 @@ impl Drop for FreeTrapStack {
 }
 
 impl LoadedTrapStack {
+
+	pub fn get(sscratch: usize) -> Self{
+		Self(sscratch)
+	}
     /// 获取从 `sscratch` 寄存器中换出的值。
     #[inline]
     pub const fn val(&self) -> usize {
@@ -137,6 +141,10 @@ pub struct TrapHandler {
 	scratch: usize,
 	/// 可以访问一些hart local，但是对于hart是全局的东西
 	pub hart: NonNull<HartContext>,
+	/// 之前的sscratch
+	/// 
+	/// 为了支持嵌套trap，可能需要使用sscratch
+	/// （即他和flow_context没有什么本质的区别，都是可能破坏，所以需要保存）
 
 	range: Range<usize>,
 	drop: fn(Range<usize>),

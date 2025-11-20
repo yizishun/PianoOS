@@ -34,7 +34,17 @@ pub trait ArchHarts {
 
 pub trait ArchTrap {
 	unsafe fn load_direct_trap_entry(&self);
-	extern "C" fn fast_handler(
+	extern "C" fn fast_handler_user(
+		ctx: FastContext,
+		a1: usize,
+		a2: usize,
+		a3: usize,
+		a4: usize,
+		a5: usize,
+		a6: usize,
+		a7: usize,
+	) -> FastResult;
+	extern "C" fn fast_handler_kernel(
 		ctx: FastContext,
 		a1: usize,
 		a2: usize,

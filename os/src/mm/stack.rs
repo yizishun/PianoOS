@@ -1,11 +1,17 @@
 use core::intrinsics::forget;
 use core::ptr::NonNull;
+use core::ops::Range;
+use alloc::alloc::dealloc;
+use riscv::interrupt::Trap;
+use core::alloc::Layout;
 
 use crate::arch::common::{ArchHarts, ArchPower, ArchTrap, FlowContext};
 use crate::global::ARCH;
 use crate::arch::common::Arch;
 use crate::{harts::HartContext, config::{USER_STACK_SIZE, KERNEL_STACK_SIZE}};
 use crate::trap::{FreeTrapStack, TrapHandler};
+use crate::trap::fast::FastHandler;
+use crate::config::KERNEL_STACK_ALIGN;
 
 // Make sure stack address can be aligned.
 const _: () = assert!(KERNEL_STACK_SIZE % align_of::<KernelStack>() == 0);
@@ -104,7 +110,7 @@ impl KernelStack {
 		unsafe { & *self.0.as_mut_ptr().cast() }
     	}
 
-	pub fn init_trap_stack(&'static mut self, hartid: usize, flow_context: NonNull<FlowContext>) -> FreeTrapStack{
+	pub fn init_trap_stack(&'static mut self, hartid: usize, flow_context: NonNull<FlowContext>, fast_handler: FastHandler) -> FreeTrapStack{
 		let hart_context = self.hart_context_mut();
 		let context_ptr = flow_context;
 		let hart_ptr = unsafe { NonNull::new_unchecked(hart_context) };
@@ -116,14 +122,20 @@ impl KernelStack {
 			|_| {}, 
 			context_ptr,
 			hart_ptr,
-			<Arch as ArchTrap>::fast_handler
+			fast_handler
 		).unwrap()
 	}
 
 	/// Initializes stack for trap handling.
     	/// - Sets up hart context.
     	/// - Creates and loads FreeTrapStack with the stack range.
-    	pub fn load_as_stack(&'static mut self, hartid: usize, flow_context: NonNull<FlowContext>) {
+    	pub fn load_as_stack(
+		&'static mut self, 
+		hartid: usize, 
+		flow_context: NonNull<FlowContext>, 
+		fast_handler: FastHandler,
+		drop: fn(Range<usize>),
+	) {
 		let hart_context = self.hart_context_mut();
 		let context_ptr = flow_context;
 		let hart_ptr = unsafe { NonNull::new_unchecked(hart_context) };
@@ -133,11 +145,24 @@ impl KernelStack {
 		forget(
 			FreeTrapStack::new(
 				range.start as usize.. range.end as usize, 
-				|_| {}, 
+				drop,
 				context_ptr,
 				hart_ptr,
-				<Arch as ArchTrap>::fast_handler
+				fast_handler
 			).unwrap().load()
 		);
+	}
+}
+
+/// drop kernel stack and internel flow_context
+pub fn stack_drop(range: Range<usize>) {
+	assert_eq!(range.end - range.start, KERNEL_STACK_SIZE);
+	let trap_handler = (range.end - KernelStack::trap_handler_size()) as *mut TrapHandler;
+	let flow_context = unsafe { (*trap_handler).context };
+	let stack_layout = Layout::from_size_align(range.end - range.start, KERNEL_STACK_ALIGN).unwrap();
+	let flow_context_layout = Layout::new::<FlowContext>();
+	unsafe {
+		dealloc(range.start as *mut u8, stack_layout);
+		dealloc(flow_context.as_ptr() as *mut u8, flow_context_layout);
 	}
 }

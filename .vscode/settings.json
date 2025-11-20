@@ -9,6 +9,7 @@
    "rust-analyzer.check.features": "all",
    "rust-analyzer.cargo.features": [
       "float",
+      "nested_trap",
    ],
    "editor.tabSize": 8,
    "editor.insertSpaces": false,

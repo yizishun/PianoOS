@@ -123,7 +123,12 @@ impl TaskManager {
 		unsafe {
 			#[allow(static_mut_refs)]
 			KERNEL_STACK.get_mut(hartid).unwrap()
-				.load_as_stack(hartid, next_flow_context);	
+				.load_as_stack(
+					hartid, 
+					next_flow_context, 
+					<Arch as ArchTrap>::fast_handler_user,
+					|_| {}
+				);
 		}
 		// init sepc, sstatus, stvec, stie
 		<Arch as ArchTrap>::boot_handler(next_app_range.start as usize);
@@ -170,7 +175,6 @@ impl TaskManager {
 		let next_app = self.run_next_at_trap();
 
 		let new_task_block = &self.tasks[next_app];
-		new_task_block.app_info().user_time.start();
 		assert!(new_task_block.status() == TaskStatus::Running);
 		info!("Kernel end {} and switch to app {}", app_id, next_app);
 	}
@@ -189,7 +193,6 @@ impl TaskManager {
 		}
 
 		let new_task_block = &self.tasks[next_app];
-		new_task_block.app_info().user_time.start();
 		assert!(new_task_block.status() == TaskStatus::Running);
 		info!("Kernel suspend {} switch to app {}", app_id, next_app);
 	}

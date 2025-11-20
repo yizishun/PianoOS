@@ -76,9 +76,6 @@ impl FastContext {
 	/// > **NOTICE** 必须先手工调用 `save_args`，或通过其他方式设置参数寄存器。
 	#[inline]
 	pub fn restore(self) -> FastResult {
-		let tctx = task_context_in_trap_stage();
-		tctx.app_info().kernel_time.end();
-		tctx.app_info().user_time.start();
 		FastResult::Restore
 	}
 
@@ -111,6 +108,7 @@ impl FastContext {
 }
 
 /// 快速路径处理结果。
+#[derive(PartialEq)]
 #[repr(usize)]
 pub enum FastResult {
 	/// 调用新上下文，只需设置 2 个或更少参数。
