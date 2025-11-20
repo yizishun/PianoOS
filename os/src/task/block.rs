@@ -32,6 +32,12 @@ impl TaskControlBlock {
 		}
 	}
 
+	pub fn flow_context(&self) -> &mut FlowContext {
+		unsafe {
+			&mut (*self.flow_context.get())
+		}
+	}
+
 	pub fn status(&self) -> TaskStatus {
 		TaskStatus::try_from(self.task_status.load(Ordering::SeqCst))
 			.unwrap()

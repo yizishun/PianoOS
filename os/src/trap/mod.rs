@@ -28,43 +28,43 @@ pub struct LoadedTrapStack(usize);
 pub struct IllegalStack;
 
 impl FreeTrapStack {
-    /// 在内存块上构造游离的陷入栈。
-    pub fn new(
-	range: Range<usize>,
-	drop: fn(Range<usize>),
+	/// 在内存块上构造游离的陷入栈。
+	pub fn new(
+		range: Range<usize>,
+		drop: fn(Range<usize>),
 
-	context_ptr: NonNull<FlowContext>,
-	hart_ptr: NonNull<HartContext>,
-	fast_handler: FastHandler,
-    ) -> Result<Self, IllegalStack> {
-	const LAYOUT: Layout = Layout::new::<TrapHandler>();
-	let bottom = range.start;
-	let top = range.end;
-	let ptr = (top - LAYOUT.size()) & !(LAYOUT.align() - 1);
-	if ptr >= bottom {
-	    let handler = unsafe { &mut *(ptr as *mut TrapHandler) };
-	    handler.range = range;
-	    handler.drop = drop;
-	    handler.context = context_ptr;
-	    handler.hart = hart_ptr;
-	    handler.fast_handler = fast_handler;
-	    Ok(Self(unsafe { NonNull::new_unchecked(handler) }))
-	} else {
-	    Err(IllegalStack)
+		context_ptr: NonNull<FlowContext>,
+		hart_ptr: NonNull<HartContext>,
+		fast_handler: FastHandler,
+	) -> Result<Self, IllegalStack> {
+		const LAYOUT: Layout = Layout::new::<TrapHandler>();
+		let bottom = range.start;
+		let top = range.end;
+		let ptr = (top - LAYOUT.size()) & !(LAYOUT.align() - 1);
+		if ptr >= bottom {
+			let handler = unsafe { &mut *(ptr as *mut TrapHandler) };
+			handler.range = range;
+			handler.drop = drop;
+			handler.context = context_ptr;
+			handler.hart = hart_ptr;
+			handler.fast_handler = fast_handler;
+			Ok(Self(unsafe { NonNull::new_unchecked(handler) }))
+		} else {
+			Err(IllegalStack)
+		}
 	}
-    }
 
-    pub fn kstack_ptr(self) -> usize {
-	self.0.as_ptr() as usize
-    }
+	pub fn kstack_ptr(self) -> usize {
+		self.0.as_ptr() as usize
+	}
 
-    /// 将这个陷入栈加载为预备陷入栈。
-    #[inline]
-    pub fn load(self) -> LoadedTrapStack {
-	let scratch = ARCH.exchange_scratch(self.0.as_ptr() as _);
-	forget(self);
-	LoadedTrapStack(scratch)
-    }
+	/// 将这个陷入栈加载为预备陷入栈。
+	#[inline]
+	pub fn load(self) -> LoadedTrapStack {
+		let scratch = ARCH.exchange_scratch(self.0.as_ptr() as _);
+		forget(self);
+		LoadedTrapStack(scratch)
+	}
 }
 
 impl Drop for FreeTrapStack {
@@ -82,38 +82,38 @@ impl LoadedTrapStack {
 	pub fn get(sscratch: usize) -> Self{
 		Self(sscratch)
 	}
-    /// 获取从 `sscratch` 寄存器中换出的值。
-    #[inline]
-    pub const fn val(&self) -> usize {
-	self.0
-    }
+	/// 获取从 `sscratch` 寄存器中换出的值。
+	#[inline]
+	pub const fn val(&self) -> usize {
+		self.0
+	}
 
-    /// 卸载陷入栈。
-    #[inline]
-    pub fn unload(self) -> FreeTrapStack {
-	let ans = unsafe { self.unload_unchecked() };
-	forget(self);
-	ans
-    }
+	/// 卸载陷入栈。
+	#[inline]
+	pub fn unload(self) -> FreeTrapStack {
+		let ans = unsafe { self.unload_unchecked() };
+		forget(self);
+		ans
+	}
 
-    /// 卸载但不消费所有权。
-    ///
-    /// # Safety
-    ///
-    /// 间接复制了所有权。用于 `Drop`。
-    #[inline]
-    unsafe fn unload_unchecked(&self) -> FreeTrapStack {
-	let ptr = ARCH.exchange_scratch(self.0) as *mut TrapHandler;
-	let handler = unsafe { NonNull::new_unchecked(ptr) };
-	FreeTrapStack(handler)
-    }
+	/// 卸载但不消费所有权。
+	///
+	/// # Safety
+	///
+	/// 间接复制了所有权。用于 `Drop`。
+	#[inline]
+	unsafe fn unload_unchecked(&self) -> FreeTrapStack {
+		let ptr = ARCH.exchange_scratch(self.0) as *mut TrapHandler;
+		let handler = unsafe { NonNull::new_unchecked(ptr) };
+		FreeTrapStack(handler)
+	}
 }
 
 impl Drop for LoadedTrapStack {
-    #[inline]
-    fn drop(&mut self) {
-	drop(unsafe { self.unload_unchecked() })
-    }
+	#[inline]
+	fn drop(&mut self) {
+		drop(unsafe { self.unload_unchecked() })
+	}
 }
 
 /// 陷入处理器上下文。
@@ -156,12 +156,12 @@ pub struct TrapHandler {
 }
 
 impl TrapHandler {
-    /// 如果从快速路径向完整路径转移，可以把一个对象放在栈底。
-    /// 用这个方法找到栈底的一个对齐的位置。
-    #[inline]
-    fn locate_fast_mail<T>(&mut self) -> *mut MaybeUninit<T> {
-	let top = self.range.end as *mut u8;
-	let offset = top.align_offset(align_of::<T>());
-	unsafe { &mut *top.add(offset).cast() }
-    }
+	/// 如果从快速路径向完整路径转移，可以把一个对象放在栈底。
+	/// 用这个方法找到栈底的一个对齐的位置。
+	#[inline]
+	fn locate_fast_mail<T>(&mut self) -> *mut MaybeUninit<T> {
+		let top = self.range.end as *mut u8;
+		let offset = top.align_offset(align_of::<T>());
+		unsafe { &mut *top.add(offset).cast() }
+	}
 }

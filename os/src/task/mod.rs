@@ -1,6 +1,7 @@
 use core::ops::Range;
 use core::ptr::{NonNull, null};
 use core::sync::atomic::Ordering;
+use core::intrinsics::forget;
 use core::{array, num};
 
 use log::info;
@@ -122,13 +123,13 @@ impl TaskManager {
 		// init trap stack, task context, hart context and bind to an app
 		unsafe {
 			#[allow(static_mut_refs)]
-			KERNEL_STACK.get_mut(hartid).unwrap()
+			forget(KERNEL_STACK.get_mut(hartid).unwrap()
 				.load_as_stack(
 					hartid, 
 					next_flow_context, 
 					<Arch as ArchTrap>::fast_handler_user,
 					|_| {}
-				);
+				));
 		}
 		// init sepc, sstatus, stvec, stie
 		<Arch as ArchTrap>::boot_handler(next_app_range.start as usize);
@@ -150,12 +151,6 @@ impl TaskManager {
 		let next_task_context = &self.tasks[next_app];
 		let next_flow_context = next_task_context.flow_context.get() as *mut FlowContext;
 		let trap_handler = trap_handler_in_trap_stage();
-
-		//set sepc, sscratch(user stack)
-		unsafe {
-			next_flow_context.as_mut().unwrap()
-				.load_others();
-		}
 
 		// switch task context
 		trap_handler.context = unsafe { NonNull::new_unchecked(next_flow_context) };

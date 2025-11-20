@@ -1,6 +1,7 @@
 ﻿use core::{mem::MaybeUninit, ptr::NonNull};
 use riscv::register::mstatus::set_fs;
 
+use crate::arch::riscv::trap::trap_end;
 use crate::harts::{HartContext, task_context_in_trap_stage};
 use crate::task::block::TaskControlBlock;
 use crate::trap::TrapHandler;
@@ -76,6 +77,15 @@ impl FastContext {
 	/// > **NOTICE** 必须先手工调用 `save_args`，或通过其他方式设置参数寄存器。
 	#[inline]
 	pub fn restore(self) -> FastResult {
+		trap_end(false);
+		FastResult::Restore
+	}
+
+	/// nested trap从快速路径恢复。
+	///
+	/// > **NOTICE** 必须先手工调用 `save_args`，或通过其他方式设置参数寄存器。
+	#[inline]
+	pub fn nested_restore(self) -> FastResult {
 		FastResult::Restore
 	}
 
@@ -89,6 +99,7 @@ impl FastContext {
 	// 丢弃当前上下文，并直接切换到另一个上下文。
 	#[inline]
 	pub fn switch_to(self) -> FastResult {
+		trap_end(true);
 	        //unsafe { others.as_ref().load_others() }; //这两步会发生在task里面，但是其实我还是觉得发生在这里比较合理
 	        //self.0.context = others;
 	        FastResult::Switch

@@ -1,4 +1,4 @@
-use crate::trap::TrapHandler;
+use crate::{arch::riscv::trap::trap_end, trap::TrapHandler};
 use crate::arch::common::FlowContext;
 
 use core::{
@@ -51,6 +51,13 @@ impl EntireContextSeparated {
 	/// 从完整路径恢复。
 	#[inline]
 	pub fn restore(self) -> EntireResult {
+		EntireResult::Restore
+	}
+	
+	/// 切换到新的上下文
+	#[inline]
+	pub fn switch(self) -> EntireResult {
+		trap_end(true);
 		EntireResult::Restore
 	}
 }

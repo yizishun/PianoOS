@@ -8,7 +8,7 @@ use core::arch::asm;
 //
 // HartContext will always at the end of Stack, so we should make sure
 // STACK_SIZE_PER_HART is a multiple of b.
-use crate::{arch::common::{ArchHarts, FlowContext}, config::KERNEL_STACK_SIZE, global::ARCH, task::{block::TaskControlBlock, harts::AppHartInfo}, trap::TrapHandler};
+use crate::{arch::common::{ArchHarts, FlowContext}, config::KERNEL_STACK_SIZE, global::ARCH, task::{block::TaskControlBlock, harts::AppHartInfo}, trap::{LoadedTrapStack, TrapHandler}};
 const _: () = assert!(KERNEL_STACK_SIZE % core::mem::align_of::<HartContext>() == 0);
 
 #[repr(C, align(128))]

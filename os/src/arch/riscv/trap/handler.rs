@@ -3,6 +3,7 @@ use crate::arch::riscv::trap::trap_end;
 use crate::config::TICK_MS;
 use crate::global::ARCH;
 use crate::arch::common::ArchTime;
+use crate::println;
 use crate::syscall::syscall;
 use crate::syscall::syscallid::SyscallID;
 use crate::trap::entire::EntireContext;
@@ -10,6 +11,13 @@ use crate::trap::entire::EntireResult;
 use crate::trap::fast::FastResult;
 use crate::trap::fast::FastContext;
 use crate::arch::common::ArchTrap;
+use crate::harts::task_context_in_trap_stage;
+use crate::trap::LoadedTrapStack;
+use crate::mm::stack::KernelStack;
+use crate::config::{KERNEL_STACK_ALIGN, KERNEL_STACK_SIZE};
+use crate::{harts::hart_context_in_trap_stage, mm::stack::stack_drop};
+use crate::arch::common::Arch;
+use crate::arch::common::FlowContext;
 use log::{warn, info};
 use riscv::interrupt::Interrupt;
 use riscv::interrupt::supervisor::Exception;
@@ -19,12 +27,8 @@ use riscv::register::sepc;
 use riscv::register::sstatus;
 use riscv::register::sscratch;
 use riscv::register::stval;
-use crate::mm::stack::KernelStack;
-use crate::config::{KERNEL_STACK_ALIGN, KERNEL_STACK_SIZE};
-use crate::{harts::hart_context_in_trap_stage, mm::stack::stack_drop};
-use crate::arch::common::Arch;
-use crate::arch::common::FlowContext;
 use core::alloc::Layout;
+use core::intrinsics::forget;
 use core::ptr::NonNull;
 use alloc::alloc::alloc;
 
@@ -46,6 +50,7 @@ pub extern "C" fn fast_handler_user(
 
 	let scause = scause::read();
 	let stval = stval::read();
+	let sepc = sepc::read();
 
 	#[cfg(feature = "nested_trap")]
 	unsafe {
@@ -54,11 +59,11 @@ pub extern "C" fn fast_handler_user(
 		let flow_context_layout = Layout::new::<FlowContext>();
 		let stack = alloc(stack_layout) as *mut KernelStack;
 		let flow_context = alloc(flow_context_layout) as *mut FlowContext;
-		(*stack).load_as_stack(
+		forget((*stack).load_as_stack(
 			hart_context_in_trap_stage().hartid(), 
 			NonNull::new_unchecked(flow_context),
 			<Arch as ArchTrap>::fast_handler_kernel,
-			stack_drop);
+			stack_drop));
 		sstatus::set_sie();
 	}
 	match scause.cause()
@@ -80,13 +85,13 @@ pub extern "C" fn fast_handler_user(
 		Trap::Exception(Exception::LoadMisaligned) => {
 			warn!("PageFault in application, kernel killed it.");
 			warn!("Illegal addr: 0x{:x}", stval);
-			warn!("excption pc: 0x{:x}", sepc::read());
+			warn!("excption pc: 0x{:x}", sepc);
 			TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
 			ctx.switch_to()
 		}
 		Trap::Exception(Exception::IllegalInstruction) => {
 			warn!("IllegalInstruction in application, kernel killed it.");
-			warn!("excption pc: 0x{:x}", sepc::read());
+			warn!("excption pc: 0x{:x}", sepc);
 			TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
 			ctx.switch_to()
 		}
@@ -95,7 +100,7 @@ pub extern "C" fn fast_handler_user(
 		Trap::Exception(Exception::InstructionPageFault) => {
 			warn!("Instruction PageFault in application, kernel killed it.");
 			warn!("Illegal addr: 0x{:x}", stval);
-			warn!("excption pc: 0x{:x}", sepc::read());
+			warn!("excption pc: 0x{:x}", sepc);
 			ctx.tasks().app_info().end();
 			TASK_MANAGER.get().unwrap().exit_cur_and_run_next();
 			ctx.switch_to()
@@ -129,9 +134,9 @@ pub extern "C" fn fast_handler_kernel(
 		Trap::Interrupt(Interrupt::SupervisorTimer) => {
 			//TODO: do something useful
 			save_regs(&mut ctx);
-			info!("Kernel recieve timer intrrupt");
+			println!("Kernel recieve timer intrrupt");
 			ARCH.set_next_timer_intr(TICK_MS);	
-			ctx.restore()
+			ctx.nested_restore()
 		}
 
 		Trap::Exception(Exception::StoreFault) |
@@ -200,21 +205,24 @@ pub extern "C" fn syscall_handler(
 
 pub extern "C" fn yield_handler(ctx: EntireContext) -> EntireResult {
 	let mut split_ctx = ctx.split().0;
-	#[cfg(not(feature = "nested_trap"))]
-	split_ctx.regs().set_sp(sscratch::read());
-	split_ctx.regs().set_pc(sepc::read() + 4);
+	if cfg!(feature = "nested_trap") {
+		let sepc = split_ctx.regs().pc;
+		split_ctx.regs().set_pc(sepc + 4);
+	} else {
+		split_ctx.regs().set_sp(sscratch::read());
+		split_ctx.regs().set_pc(sepc::read() + 4);
+	}
 	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next();
-	trap_end(true);
-	split_ctx.restore()
+	split_ctx.switch()
 }
 
 pub extern "C" fn timer_handler(ctx: EntireContext) -> EntireResult {
 	let mut split_ctx = ctx.split().0;
-	#[cfg(not(feature = "nested_trap"))]
-	split_ctx.regs().set_sp(sscratch::read());
-	split_ctx.regs().set_pc(sepc::read());
+	#[cfg(not(feature = "nested_trap"))] {
+		split_ctx.regs().set_sp(sscratch::read());
+		split_ctx.regs().set_pc(sepc::read());
+	}
 	ARCH.set_next_timer_intr(TICK_MS);
 	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next();
-	trap_end(true);
-	split_ctx.restore()
+	split_ctx.switch()
 }

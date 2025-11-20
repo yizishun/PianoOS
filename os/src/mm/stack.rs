@@ -9,7 +9,7 @@ use crate::arch::common::{ArchHarts, ArchPower, ArchTrap, FlowContext};
 use crate::global::ARCH;
 use crate::arch::common::Arch;
 use crate::{harts::HartContext, config::{USER_STACK_SIZE, KERNEL_STACK_SIZE}};
-use crate::trap::{FreeTrapStack, TrapHandler};
+use crate::trap::{FreeTrapStack, LoadedTrapStack, TrapHandler};
 use crate::trap::fast::FastHandler;
 use crate::config::KERNEL_STACK_ALIGN;
 
@@ -110,7 +110,13 @@ impl KernelStack {
 		unsafe { & *self.0.as_mut_ptr().cast() }
     	}
 
-	pub fn init_trap_stack(&'static mut self, hartid: usize, flow_context: NonNull<FlowContext>, fast_handler: FastHandler) -> FreeTrapStack{
+	pub fn init_trap_stack(
+		&'static mut self, 
+		hartid: usize, 
+		flow_context: NonNull<FlowContext>, 
+		fast_handler: FastHandler,
+		drop: fn(Range<usize>),
+	) -> FreeTrapStack{
 		let hart_context = self.hart_context_mut();
 		let context_ptr = flow_context;
 		let hart_ptr = unsafe { NonNull::new_unchecked(hart_context) };
@@ -119,7 +125,7 @@ impl KernelStack {
 		let range = self.0.as_ptr_range();
 		FreeTrapStack::new(
 			range.start as usize.. range.end as usize, 
-			|_| {}, 
+			drop, 
 			context_ptr,
 			hart_ptr,
 			fast_handler
@@ -135,14 +141,13 @@ impl KernelStack {
 		flow_context: NonNull<FlowContext>, 
 		fast_handler: FastHandler,
 		drop: fn(Range<usize>),
-	) {
+	) -> LoadedTrapStack {
 		let hart_context = self.hart_context_mut();
 		let context_ptr = flow_context;
 		let hart_ptr = unsafe { NonNull::new_unchecked(hart_context) };
 		hart_context.init(hartid);
 
 		let range = self.0.as_ptr_range();
-		forget(
 			FreeTrapStack::new(
 				range.start as usize.. range.end as usize, 
 				drop,
@@ -150,7 +155,6 @@ impl KernelStack {
 				hart_ptr,
 				fast_handler
 			).unwrap().load()
-		);
 	}
 }
 

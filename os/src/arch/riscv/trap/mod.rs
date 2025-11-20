@@ -12,6 +12,7 @@ use crate::mm::stack::UserStack;
 use crate::trap::fast::FastResult;
 use crate::trap::fast::FastContext;
 use crate::trap::LoadedTrapStack;
+use crate::harts::hart_context_in_trap_stage;
 pub mod handler;
 
 impl<C> ArchTrap for Riscv64<C> {
@@ -33,15 +34,6 @@ impl<C> ArchTrap for Riscv64<C> {
 		a7: usize,
 	) -> FastResult {
 		let result = handler::fast_handler_user(ctx, a1, a2, a3, a4, a5, a6, a7);
-		match result {
-		    FastResult::Call|
-		    FastResult::FastCall |
-		    FastResult::Switch => 
-		    	trap_end(true),
-		    FastResult::Restore => 
-		    	trap_end(false),
-		    FastResult::Continue => ()
-		}
 		result
 	}
 
@@ -206,7 +198,7 @@ pub struct FlowContext {
 	pub sp: usize,      // 30..
 	pub pc: usize,      // 31..
 	#[cfg(feature = "float")]
-	pub f:  [usize; 32] // 32..
+	pub f:  [usize; 32], // 32..
 }
 
 impl FlowContext {
@@ -239,7 +231,7 @@ impl FlowContext {
 			sp: user_stack + USER_STACK_SIZE,
 			pc: start_addr,
 			#[cfg(feature = "float")]
-			f: [0; 32]
+			f: [0; 32],
 		}
 	}
 
@@ -288,7 +280,9 @@ pub unsafe extern "C" fn trap_entry() {
 		save!(t5 => a0[6]),
 		save!(t6 => a0[7]),
 		save!(tp => a0[29]), //tp存放原sscratch值，在整个trap过程有效
-		csr_save!(sscratch => t0 => a0[30]), //如果要支持嵌套trap，需要保存可能被破坏的sscratch
+		//如果要支持嵌套trap，需要保存可能被破坏的sscratch
+		csr_save!(sscratch => t0 => a0[30]), 
+		csr_save!(sepc => t0 => a0[31]),
 		// 调用快速路径函数
 		//
 		// | reg    | position
@@ -463,6 +457,7 @@ pub unsafe extern "C" fn trap_entry() {
 		load!(a1[15] => a7),
 		"0:", // 设置少量参数寄存器
 		csr_load!(a1[30] => a0 => sscratch),
+		csr_load!(a1[31] => a0 => sepc),
 		load!(a1[ 8] => a0),
 		load!(a1[ 9] => a1),
 		exchange!(),
@@ -493,15 +488,22 @@ pub(crate) unsafe extern "C" fn locate_user_stack() {
 
 // some commmon bavaior in the end of trap
 pub extern "C" fn trap_end(switch: bool) {
-	if !switch {
-		task_context_in_trap_stage().app_info().kernel_time.end();
-	}
-	task_context_in_trap_stage().app_info().user_time.start();
 	#[cfg(feature = "nested_trap")]
 	unsafe {
 		sstatus::clear_sie();
-		//TODO: 这样太粗糙
-		let load = LoadedTrapStack::get(0);
-		drop(load)
+		let sp = task_context_in_trap_stage().flow_context.get().as_mut().unwrap().sp;
+		drop(LoadedTrapStack::get(sp));
 	}
+	// switch will end previous kernel time in switch function
+	if !switch {
+		task_context_in_trap_stage().app_info().kernel_time.end();
+	} 
+
+	// switch should restore sp and pc
+	if switch {
+		unsafe {
+			task_context_in_trap_stage().flow_context().load_others();
+		}
+	}
+	task_context_in_trap_stage().app_info().user_time.start();
 }
