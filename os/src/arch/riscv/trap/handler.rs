@@ -135,7 +135,7 @@ pub extern "C" fn fast_handler_kernel(
 		Trap::Interrupt(Interrupt::SupervisorTimer) => {
 			//TODO: do something useful
 			save_regs(&mut ctx);
-			println!("Kernel recieve timer intrrupt");
+			//println!("Kernel recieve timer intrrupt");
 			ARCH.set_next_timer_intr(TICK_MS);	
 			ctx.nested_restore()
 		}
