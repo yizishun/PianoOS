@@ -43,7 +43,7 @@ pub extern "C" fn fast_handler_user(
 	};
 	ctx.tasks().app_info().user_time.end();
 	ctx.tasks().app_info().kernel_time.start();
-	
+
 	let scause = scause::read();
 	let stval = stval::read();
 
@@ -130,6 +130,7 @@ pub extern "C" fn fast_handler_kernel(
 			//TODO: do something useful
 			save_regs(&mut ctx);
 			info!("Kernel recieve timer intrrupt");
+			ARCH.set_next_timer_intr(TICK_MS);	
 			ctx.restore()
 		}
 
