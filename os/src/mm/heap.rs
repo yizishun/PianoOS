@@ -1,7 +1,4 @@
-use core::ops::Range;
-
 use crate::config::KERNEL_HEAP_SIZE;
-use alloc::alloc::dealloc;
 use buddy_system_allocator::LockedHeap;
 
 #[unsafe(link_section = ".bss.heap")]

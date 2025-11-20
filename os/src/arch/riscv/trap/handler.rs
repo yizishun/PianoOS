@@ -127,6 +127,7 @@ pub extern "C" fn fast_handler_kernel(
 	};
 	let scause = scause::read();
 	let stval = stval::read();
+	let sepc = sepc::read();
 	match scause.cause()
 		.try_into::<riscv::interrupt::Interrupt, riscv::interrupt::supervisor::Exception>()
 		.unwrap() {
@@ -145,19 +146,19 @@ pub extern "C" fn fast_handler_kernel(
 		Trap::Exception(Exception::LoadMisaligned) => {
 			panic!("PageFault in kernel, kernel panic.\n Illegal addr: 0x{:x}\n, excption pc: 0x{:x}\n", 
 				stval,
-				sepc::read()
+				sepc
 			);
 		}
 		Trap::Exception(Exception::IllegalInstruction) => {
 			panic!("IllegalInstruction in application, kernel panic, excption pc: 0x{:x}",
-			sepc::read());
+			sepc);
 		}
 		Trap::Exception(Exception::InstructionFault) |
 		Trap::Exception(Exception::InstructionMisaligned) |
 		Trap::Exception(Exception::InstructionPageFault) => {
 			panic!("Instruction PageFault in kernel, kernel panic.\n Illegal addr: 0x{:x}\n, excption pc: 0x{:x}\n", 
 				stval,
-				sepc::read()
+				sepc
 			);
 		}
 
@@ -196,7 +197,11 @@ pub extern "C" fn syscall_handler(
 		}
 		_ => {
 			unsafe {
-				sepc::write(sepc::read() + 4);
+				if cfg!(feature = "nested_trap") {
+					ctx.regs().pc = ctx.regs().pc + 4;
+				} else {
+					sepc::write(sepc::read() + 4);
+				}
 			}
 			ctx.restore()
 		}
