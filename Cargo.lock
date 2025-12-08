@@ -159,15 +159,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
-name = "dyn_serde"
-version = "1.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5db82dd40ede1190058670e7254f3f660398dda450c17ccb46d56ada11605d03"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "elf"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -178,6 +169,17 @@ name = "embedded-hal"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "361a90feb7004eca4019fb28352a9465666b24f840f5c3cddf0ff13920590b89"
+
+[[package]]
+name = "erased-serde"
+version = "0.4.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89e8918065695684b2b0702da20382d5ae6065cf3327bc2d6436bd49a71ce9f3"
+dependencies = [
+ "serde",
+ "serde_core",
+ "typeid",
+]
 
 [[package]]
 name = "find-msvc-tools"
@@ -313,9 +315,9 @@ dependencies = [
 [[package]]
 name = "serde-device-tree"
 version = "0.0.1"
-source = "git+https://github.com/rustsbi/serde-device-tree?rev=805718b#805718b71cbeb9bec4a1bc53fcf71f69450e9490"
+source = "git+https://github.com/rustsbi/serde-device-tree?rev=ffb4855#ffb4855fad24f7e90bfb533c151aa311dc8d9a7b"
 dependencies = [
- "dyn_serde",
+ "erased-serde",
  "serde",
 ]
 
@@ -397,6 +399,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "typeid"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc7d623258602320d5c55d1bc22793b57daff0ec7efc270ea7d55ce1d5f5471c"
 
 [[package]]
 name = "uart16550"
