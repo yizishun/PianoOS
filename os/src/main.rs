@@ -7,10 +7,12 @@
 #![feature(sync_unsafe_cell)]
 #![feature(min_specialization)]
 #![feature(stmt_expr_attributes)]
+#![feature(alloc_error_handler)]
 
 use log::info;
 
 use crate::arch::common::ArchPower;
+use crate::arch::common::ArchHarts;
 use crate::global::*;
 use crate::loader::Loader;
 use crate::logging::PIANOLOGGER;
@@ -54,6 +56,7 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	print_kernel_mem();
 
 	LOADER.call_once(|| Loader::new());
+	// elf load happen in this func
 	TASK_MANAGER.call_once(|| 
 		TaskManager::new()
 	);
@@ -63,13 +66,12 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 
 	LOADER.get().unwrap().print_app_info();
 
-	// elf load happen in this func
 	if TASK_MANAGER.get().unwrap().num_app != 0 {
 		//  switch logger
 		PIANOLOGGER.get().unwrap().set_trap_logger();
 		for i in 0..HartContext::get_hartnum() {
-			let start_addr = arch::common::entry::hart_start as usize;
-			sbi_rt::hart_start(i, start_addr, 0); //TODO: arch specific
+			let start_addr = arch::common::entry::hart_start as *const () as usize;
+			ARCH.hart_start(i, start_addr, 0);
 		}
 
 		TASK_MANAGER

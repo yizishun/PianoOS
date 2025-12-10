@@ -114,9 +114,8 @@ impl TaskManager {
 
 	pub fn prepare_next_at_boot(&self, hartid: usize) -> usize {
 		let next_app = self.find_next_ready_and_set_run();
-		let next_task_context = &self.tasks[next_app];
 		let next_flow_context = unsafe {
-			NonNull::new_unchecked(next_task_context.flow_context.get() as *mut _)
+			NonNull::new_unchecked((&self.tasks[next_app]).flow_context.get() as *mut _)
 		};
 		let next_app_range = &self.app_range[next_app];
 		
@@ -148,8 +147,7 @@ impl TaskManager {
 	pub fn run_next_at_trap(&self) -> usize{
 		let next_app = self.find_next_ready_and_set_run();
 		assert!(self.tasks[next_app].status() == TaskStatus::Running);
-		let next_task_context = &self.tasks[next_app];
-		let next_flow_context = next_task_context.flow_context.get() as *mut FlowContext;
+		let next_flow_context = (&self.tasks[next_app]).flow_context.get() as *mut FlowContext;
 		let trap_handler = trap_handler_in_trap_stage();
 
 		// switch task context

@@ -14,3 +14,8 @@ pub fn heap_init() {
 			      .init(HEAP.as_ptr() as usize, KERNEL_HEAP_SIZE);
 	}
 }
+
+#[alloc_error_handler]
+pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
+    panic!("Heap allocation error, layout = {:?}", layout);
+}

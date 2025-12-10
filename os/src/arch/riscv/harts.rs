@@ -14,4 +14,8 @@ impl<C> ArchHarts for Riscv64<C> {
 	fn get_scratch(&self) -> usize {
 		sscratch::read()
 	}
+
+	fn hart_start(&self, hartid: usize, start_addr: usize, opaque: usize) {
+		sbi_rt::hart_start(hartid, start_addr, opaque);
+	}
 }

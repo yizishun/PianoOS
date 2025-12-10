@@ -30,6 +30,7 @@ pub trait ArchTime {
 pub trait ArchHarts {
 	fn exchange_scratch(&self, val: usize) -> usize;
 	fn get_scratch(&self) -> usize;
+	fn hart_start(&self, hartid: usize, start_addr: usize, opaque: usize); //TODO: may be error
 }
 
 pub trait ArchTrap {
