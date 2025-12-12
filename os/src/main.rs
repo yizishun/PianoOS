@@ -9,6 +9,7 @@
 #![feature(stmt_expr_attributes)]
 #![feature(alloc_error_handler)]
 
+use alloc::boxed::Box;
 use log::info;
 
 use crate::arch::common::ArchPower;
@@ -17,6 +18,8 @@ use crate::global::*;
 use crate::loader::Loader;
 use crate::logging::PIANOLOGGER;
 use crate::logging::PianoLogger;
+use crate::mm::frame_allocator::FrameAllocator;
+use crate::mm::frame_allocator::StackFrameAllocator;
 use crate::{
 	harts::HartContext, task::TaskManager, mm::heap::heap_init, platform::Platform,
 };
@@ -45,8 +48,10 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	clear_bss();
 	heap_init();
 
+	// parse dtb and init platform
 	PLATFORM.call_once(|| Platform::init_platform(device_tree).unwrap());
 
+	// init log system
 	PIANOLOGGER.call_once(|| { PianoLogger::set_boot_logger() });
 	logging::init().expect("Logging System init fail");
 	info!("Logging system init success");
@@ -55,7 +60,19 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	PLATFORM.get().unwrap().print_platform_info();
 	print_kernel_mem();
 
+	// init frame allocator
+	FRAME_ALLOCATOR.call_once(|| FrameAllocator::new(Box::new(
+		{
+			// use StackFrameAllocator at first
+			let mut stack = StackFrameAllocator::new();
+			stack.init_scope();
+			stack
+		}
+	)));
+	
+	// get elf info and init loader
 	LOADER.call_once(|| Loader::new());
+	LOADER.get().unwrap().print_app_info();
 	// elf load happen in this func
 	TASK_MANAGER.call_once(|| 
 		TaskManager::new()
@@ -63,8 +80,6 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	let next_app = 
 		//init HartContext, TrapContext, TaskContext
 		TASK_MANAGER.get().unwrap().prepare_next_at_boot(hartid);
-
-	LOADER.get().unwrap().print_app_info();
 
 	if TASK_MANAGER.get().unwrap().num_app != 0 {
 		//  switch logger

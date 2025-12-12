@@ -1,3 +1,4 @@
+use crate::mm::frame_allocator::{FrameAllocator, StackFrameAllocator};
 use crate::task::TaskManager;
 use crate::config::{MAX_APP_NUM, NUM_HART_MAX};
 use crate::loader::Loader;
@@ -34,6 +35,8 @@ pub static PLATFORM: Once<Platform> = Once::new();
 pub static TASK_MANAGER: Once<TaskManager> = Once::new();
 
 pub static LOADER: Once<Loader> = Once::new();
+
+pub static FRAME_ALLOCATOR: Once<FrameAllocator> = Once::new();
 
 #[unsafe(link_section = ".bss.kstack")]
 pub static mut KERNEL_STACK: [KernelStack; NUM_HART_MAX] = [KernelStack::ZERO; NUM_HART_MAX];
