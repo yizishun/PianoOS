@@ -1,5 +1,7 @@
 use core::slice::from_raw_parts_mut;
 
+use log::info;
+
 use crate::config::{self, PAGE_SIZE, PAGE_SIZE_BITS};
 
 const PA_WIDTH_SV39: usize = 56;

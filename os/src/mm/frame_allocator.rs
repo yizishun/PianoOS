@@ -1,6 +1,11 @@
 use alloc::{boxed::Box, vec::Vec};
+use log::{debug, info};
+use core::fmt::Debug;
+use core::fmt::Formatter;
+use core::fmt;
 use spin::Mutex;
 
+use crate::mm::address::PhysAddr;
 use crate::{config, global::{self, FRAME_ALLOCATOR}, mm::address::PhysPageNum};
 
 pub trait FrameAllocatorInterface: Send {
@@ -16,6 +21,12 @@ pub struct FrameAllocator {
 // it is RAII
 pub struct FrameTracker {
 	pub ppn: PhysPageNum
+}
+
+impl Debug for FrameTracker {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		f.write_fmt(format_args!("FrameTracker:PPN={:#x}", self.ppn.0))
+	}
 }
 
 impl FrameTracker {
@@ -106,8 +117,30 @@ impl StackFrameAllocator {
 	}
 
 	pub fn init_scope(&mut self) {
-		let l = PhysPageNum::from(unsafe{ global::ekernel });
-		let r = PhysPageNum::from(config::MEMORY_END);
-		self.init(l, r);
+		let laddr = PhysAddr::from(&raw const global::ekernel as usize);
+		let raddr = PhysAddr::from(config::MEMORY_END);
+		let lppn = laddr.ppn_ceil();
+		let rppn = raddr.ppn_floor();
+		info!("Frame start addr: {:#x}, start ppn: {:#x}", laddr.0, lppn.0);
+		info!("Frame end   addr: {:#x}, end ppn: {:#x}", raddr.0, rppn.0);
+		self.init(lppn, rppn);
 	}
+}
+
+#[allow(unused)]
+pub fn frame_allocator_test() {
+	let mut v: Vec<FrameTracker> = Vec::new();
+	for i in 0..5 {
+		let frame = FRAME_ALLOCATOR.get().unwrap().frame_alloc().unwrap();
+		debug!("{:?}", frame);
+		v.push(frame);
+	}
+	v.clear();
+	for i in 0..5 {
+		let frame = FRAME_ALLOCATOR.get().unwrap().frame_alloc().unwrap();
+		debug!("{:?}", frame);
+		v.push(frame);
+	}
+	drop(v);
+	debug!("frame_allocator_test passed!");
 }

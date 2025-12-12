@@ -20,6 +20,7 @@ use crate::logging::PIANOLOGGER;
 use crate::logging::PianoLogger;
 use crate::mm::frame_allocator::FrameAllocator;
 use crate::mm::frame_allocator::StackFrameAllocator;
+use crate::mm::frame_allocator::frame_allocator_test;
 use crate::{
 	harts::HartContext, task::TaskManager, mm::heap::heap_init, platform::Platform,
 };
@@ -69,6 +70,7 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 			stack
 		}
 	)));
+	frame_allocator_test();
 	
 	// get elf info and init loader
 	LOADER.call_once(|| Loader::new());
