@@ -1,7 +1,14 @@
 # PianoOS
 Base on [rCore-Tutorial-Book-v3](https://rcore-os.cn/rCore-Tutorial-Book-v3/index.html)
 
-TODO:
+## Quik Start
+```sh
+cargo all -f float -f nested_trap
+```
+the details is in `.cargo/config/toml`
+
+
+## TODO:
 - la的支持
 - ch3练习：获取任务信息
 - ch3练习：打印调用堆栈
