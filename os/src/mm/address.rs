@@ -1,4 +1,4 @@
-use core::slice::from_raw_parts_mut;
+use core::{iter::Step, ops::Range, slice::from_raw_parts_mut};
 
 use log::info;
 
@@ -111,3 +111,19 @@ impl VirtAddr {
 		VirtPageNum((self.0 + PAGE_SIZE - 1) >> PAGE_SIZE_BITS)
 	}
 }
+
+impl Step for VirtPageNum {
+	fn steps_between(start: &Self, end: &Self) -> (usize, Option<usize>) {
+		Step::steps_between(&start.0, &end.0)
+    	}
+
+	fn forward_checked(start: Self, count: usize) -> Option<Self> {
+		Step::forward_checked(start.0, count).map(VirtPageNum)
+	}
+
+	fn backward_checked(start: Self, count: usize) -> Option<Self> {
+		Step::backward_checked(start.0, count).map(VirtPageNum)
+	}
+}
+
+pub type VPNRange = Range<VirtPageNum>;

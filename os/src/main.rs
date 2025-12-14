@@ -8,6 +8,7 @@
 #![feature(min_specialization)]
 #![feature(stmt_expr_attributes)]
 #![feature(alloc_error_handler)]
+#![feature(step_trait)]
 
 use alloc::boxed::Box;
 use log::info;
