@@ -32,7 +32,8 @@ impl Debug for FrameTracker {
 impl FrameTracker {
 	pub fn new(ppn: PhysPageNum) -> Self {
 		// page cleaning
-		let byte_array = ppn.get_byte_array();
+		// SAFETY: it the first time get it byte array
+		let byte_array = unsafe { ppn.get_byte_array() };
 		byte_array.iter_mut().for_each(|b| *b = 0);
 
 		Self { ppn }

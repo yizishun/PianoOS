@@ -2,16 +2,28 @@ use core::slice::from_raw_parts_mut;
 
 use log::info;
 
-use crate::config::{self, PAGE_SIZE, PAGE_SIZE_BITS};
+use crate::{config::{self, PAGE_SIZE, PAGE_SIZE_BITS}, mm::page_table::PageTableNode};
 
 const PA_WIDTH_SV39: usize = 56;
 const VA_WIDTH_SV39: usize = 39;
 const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - PAGE_SIZE_BITS;
 const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_SIZE_BITS;
 
+// RISC-V SV39 Physical Address(Total 39 bits)
+// +-------------------------+------------+------------+----------------------+
+// |          PPN[2]         |   PPN[1]   |   PPN[0]   |      Page Offset     |
+// |         26 bits         |   9 bits   |   9 bits   |        12 bits       |
+// |         [55..30]        |  [29..21]  |  [20..12]  |        [11..0]       |
+// +-------------------------+------------+------------+----------------------+
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct PhysAddr(pub usize);
 
+// RISC-V SV39 Virtual Address(Total 56 bits)
+// +------------+------------+------------+----------------------+
+// |   VPN[2]   |   VPN[1]   |   VPN[0]   |      Page Offset     |
+// |   9 bits   |   9 bits   |   9 bits   |        12 bits       |
+// |  [38..30]  |  [29..21]  |  [20..12]  |        [11..0]       |
+// +------------+------------+------------+----------------------+
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct VirtAddr(pub usize);
 
@@ -35,11 +47,34 @@ impl From<usize> for VirtPageNum {
 }
 
 impl PhysPageNum {
-	pub fn get_byte_array(&self) -> &'static mut [u8] {
-		let base_addr:PhysAddr = (*self).into();
+	pub unsafe fn get_byte_array(&self) -> &'static mut [u8] {
+		let pa:PhysAddr = (*self).into();
 		unsafe {
-			from_raw_parts_mut(base_addr.0 as *mut u8, PAGE_SIZE)
+			from_raw_parts_mut(pa.0 as *mut u8, PAGE_SIZE)
 		}
+	}
+
+	pub unsafe fn get_pte_node(&self) -> &'static mut PageTableNode {
+		PageTableNode::from_ppn(*self)
+	}
+
+	pub unsafe fn get_mut<T>(&self) -> &'static mut T {
+		let pa: PhysAddr = self.clone().into();
+		unsafe {
+			(pa.0 as *mut T).as_mut().unwrap()
+		}
+    }
+}
+
+impl VirtPageNum {
+	pub fn indexes(&self) -> [usize; 3] {
+		let mut vpn = self.0;
+		let mut idx = [0usize; 3];
+		for i in (0..3).rev() {
+			idx[i] = vpn & 511;
+			vpn >>= 9;
+		}
+		idx
 	}
 }
 
