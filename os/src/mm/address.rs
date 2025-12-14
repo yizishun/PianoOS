@@ -15,7 +15,7 @@ const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_SIZE_BITS;
 // |         26 bits         |   9 bits   |   9 bits   |        12 bits       |
 // |         [55..30]        |  [29..21]  |  [20..12]  |        [11..0]       |
 // +-------------------------+------------+------------+----------------------+
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct PhysAddr(pub usize);
 
 // RISC-V SV39 Virtual Address(Total 56 bits)
@@ -24,13 +24,13 @@ pub struct PhysAddr(pub usize);
 // |   9 bits   |   9 bits   |   9 bits   |        12 bits       |
 // |  [38..30]  |  [29..21]  |  [20..12]  |        [11..0]       |
 // +------------+------------+------------+----------------------+
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct VirtAddr(pub usize);
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct PhysPageNum(pub usize);
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct VirtPageNum(pub usize);
 
 impl From<usize> for PhysAddr {
@@ -84,6 +84,12 @@ impl From<PhysPageNum> for PhysAddr {
 	}
 }
 
+impl From<VirtPageNum> for VirtAddr {
+	fn from(vpn: VirtPageNum) -> Self {
+		Self (vpn.0 << PAGE_SIZE_BITS)
+	}
+}
+
 impl PhysAddr {
 	pub fn page_offset(&self) -> usize {
 		self.0 & (PAGE_SIZE - 1)
@@ -127,3 +133,41 @@ impl Step for VirtPageNum {
 }
 
 pub type VPNRange = Range<VirtPageNum>;
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test_case]
+	fn test_address_conversions() {
+		let pa = PhysAddr(0x1234_5000);
+		let ppn = PhysPageNum(0x1234_5);
+		assert_eq!(pa.ppn_floor(), ppn);
+		assert_eq!(PhysAddr::from(ppn), pa);
+
+		let va = VirtAddr(0x1234_5000);
+		let vpn = VirtPageNum(0x1234_5);
+		assert_eq!(va.vpn_floor(), vpn);
+		assert_eq!(VirtAddr::from(vpn), va);
+		
+		// Test page offset
+		assert_eq!(PhysAddr(0x1234_5678).page_offset(), 0x678);
+		assert_eq!(VirtAddr(0x1234_5678).page_offset(), 0x678);
+
+		crate::println!("test_address_conversions passed!");
+	}
+
+	#[test_case]
+	fn test_virt_page_num_step() {
+		let start = VirtPageNum(0x10);
+		let end = VirtPageNum(0x15);
+		let range: VPNRange = VPNRange { start, end };
+		let mut count = 0;
+		for vpn in range {
+		assert_eq!(vpn.0, 0x10 + count);
+		count += 1;
+		}
+		assert_eq!(count, 5);
+		crate::println!("test_virt_page_num_step passed!");
+	}
+}

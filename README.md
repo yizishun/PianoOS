@@ -3,7 +3,7 @@ Base on [rCore-Tutorial-Book-v3](https://rcore-os.cn/rCore-Tutorial-Book-v3/inde
 
 ## Quik Start
 ```sh
-cargo all -f float -f nested_trap
+cargo all -f float -f nested_trap --test
 ```
 the details is in `.cargo/config/toml`
 

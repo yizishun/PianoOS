@@ -129,21 +129,39 @@ impl StackFrameAllocator {
 	}
 }
 
-#[test_case]
-#[allow(unused)]
-pub fn frame_allocator_test() {
-	let mut v: Vec<FrameTracker> = Vec::new();
-	for i in 0..5 {
-		let frame = FRAME_ALLOCATOR.get().unwrap().frame_alloc().unwrap();
-		println!("{:?}", frame);
-		v.push(frame);
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test_case]
+	#[allow(unused)]
+	fn frame_allocator_test() {
+		let mut v: Vec<FrameTracker> = Vec::new();
+		for i in 0..5 {
+			let frame = FRAME_ALLOCATOR.get().unwrap().frame_alloc().unwrap();
+			println!("{:?}", frame);
+			v.push(frame);
+		}
+		v.clear();
+		for i in 0..5 {
+			let frame = FRAME_ALLOCATOR.get().unwrap().frame_alloc().unwrap();
+			println!("{:?}", frame);
+			v.push(frame);
+		}
+		drop(v);
+		println!("frame_allocator_test passed!");
 	}
-	v.clear();
-	for i in 0..5 {
-		let frame = FRAME_ALLOCATOR.get().unwrap().frame_alloc().unwrap();
-		println!("{:?}", frame);
-		v.push(frame);
+
+	#[test_case]
+	fn test_frame_recycling() {
+		let frame1 = FRAME_ALLOCATOR.get().unwrap().frame_alloc().unwrap();
+		let ppn1 = frame1.ppn;
+		drop(frame1);
+		
+		let frame2 = FRAME_ALLOCATOR.get().unwrap().frame_alloc().unwrap();
+		let ppn2 = frame2.ppn;
+		// Stack allocator should recycle the last deallocated frame (LIFO)
+		assert_eq!(ppn1, ppn2);
+		crate::println!("test_frame_recycling passed!");
 	}
-	drop(v);
-	println!("frame_allocator_test passed!");
 }
