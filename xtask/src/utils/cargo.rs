@@ -8,7 +8,7 @@ use std::{
 use super::CmdOptional;
 
 pub struct Cargo {
-    	cmd: Command,
+    	pub cmd: Command,
 }
 
 #[allow(unused)]
@@ -32,6 +32,13 @@ impl Cargo {
 	pub fn release(&mut self, release: bool) -> &mut Self {
 		if (release) {
 			self.arg("--release");
+		}
+		self
+	}
+
+	pub fn test(&mut self, test: bool) -> &mut Self {
+		if (test) {
+			self.arg("--tests");
 		}
 		self
 	}
@@ -60,6 +67,11 @@ impl Cargo {
 
 	pub fn no_default_features(&mut self) -> &mut Self {
 		self.arg("--no-default-features");
+		self
+	}
+
+	pub fn no_run(&mut self) -> &mut Self {
+		self.arg("--no-run");
 		self
 	}
 

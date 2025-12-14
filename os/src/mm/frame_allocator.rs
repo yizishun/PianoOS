@@ -6,6 +6,7 @@ use core::fmt;
 use spin::Mutex;
 
 use crate::mm::address::PhysAddr;
+use crate::println;
 use crate::{config, global::{self, FRAME_ALLOCATOR}, mm::address::PhysPageNum};
 
 pub trait FrameAllocatorInterface: Send {
@@ -128,20 +129,21 @@ impl StackFrameAllocator {
 	}
 }
 
+#[test_case]
 #[allow(unused)]
 pub fn frame_allocator_test() {
 	let mut v: Vec<FrameTracker> = Vec::new();
 	for i in 0..5 {
 		let frame = FRAME_ALLOCATOR.get().unwrap().frame_alloc().unwrap();
-		debug!("{:?}", frame);
+		println!("{:?}", frame);
 		v.push(frame);
 	}
 	v.clear();
 	for i in 0..5 {
 		let frame = FRAME_ALLOCATOR.get().unwrap().frame_alloc().unwrap();
-		debug!("{:?}", frame);
+		println!("{:?}", frame);
 		v.push(frame);
 	}
 	drop(v);
-	debug!("frame_allocator_test passed!");
+	println!("frame_allocator_test passed!");
 }

@@ -9,6 +9,9 @@
 #![feature(stmt_expr_attributes)]
 #![feature(alloc_error_handler)]
 #![feature(step_trait)]
+#![feature(custom_test_frameworks)]
+#![test_runner(crate::test::test_runner)]
+#![reexport_test_harness_main = "test_main"]
 
 use alloc::boxed::Box;
 use log::info;
@@ -21,7 +24,6 @@ use crate::logging::PIANOLOGGER;
 use crate::logging::PianoLogger;
 use crate::mm::frame_allocator::FrameAllocator;
 use crate::mm::frame_allocator::StackFrameAllocator;
-use crate::mm::frame_allocator::frame_allocator_test;
 use crate::{
 	harts::HartContext, task::TaskManager, mm::heap::heap_init, platform::Platform,
 };
@@ -42,6 +44,7 @@ mod trap;
 mod harts;
 mod syscall;
 mod loader;
+mod test;
 
 extern crate alloc;
 
@@ -71,7 +74,6 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 			stack
 		}
 	)));
-	frame_allocator_test();
 	
 	// get elf info and init loader
 	LOADER.call_once(|| Loader::new());
@@ -83,6 +85,10 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	let next_app = 
 		//init HartContext, TrapContext, TaskContext
 		TASK_MANAGER.get().unwrap().prepare_next_at_boot(hartid);
+
+	//test
+	#[cfg(test)]
+    	test_main();
 
 	if TASK_MANAGER.get().unwrap().num_app != 0 {
 		//  switch logger
