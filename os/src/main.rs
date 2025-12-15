@@ -63,7 +63,7 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	info!("boot hartid: {}", hartid);
 	info!("device tree addr: {:p}", device_tree as *const u8);
 	PLATFORM.get().unwrap().print_platform_info();
-	print_kernel_mem();
+	crate::mm::addr_space::print_kernel_mem();
 
 	// init frame allocator
 	FRAME_ALLOCATOR.call_once(|| FrameAllocator::new(Box::new(
@@ -132,20 +132,5 @@ fn clear_bss() {
 			ptr.write_volatile(0);
 			ptr = ptr.offset(1);
 		}
-	}
-}
-
-fn print_kernel_mem() {
-	unsafe {
-		info!("kernel memory map:");
-		info!("kernel base = {:<10p}", &skernel);
-		info!(".text      : [{:<10p}, {:<10p}]", &stext, &etext);
-		info!(".rodata    : [{:<10p}, {:<10p}]", &srodata, &erodata);
-		info!(".data      : [{:<10p}, {:<10p}]", &sdata, &edata);
-		info!(".bss.kstack: [{:<10p}, {:<10p}]", &skstack, &ekstack);
-		info!(".bss.ustack: [{:<10p}, {:<10p}]", &sustack, &eustack);
-		info!(".bss.heap  : [{:<10p}, {:<10p}]", &sheap, &eheap);
-		info!(".bss       : [{:<10p}, {:<10p}]", &sbss, &ebss);
-		info!("kernel end = {:<10p}", &ekernel);
 	}
 }

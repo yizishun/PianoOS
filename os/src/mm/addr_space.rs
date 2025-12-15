@@ -1,6 +1,6 @@
 use core::ops::Range;
 
-use crate::config::PAGE_SIZE;
+use crate::config::{MEMORY_END, PAGE_SIZE};
 use crate::global::FRAME_ALLOCATOR;
 use crate::mm::address::{PhysPageNum, VPNRange, VirtAddr};
 use crate::mm::page_table::{self, PTEFlags, PageTableTree};
@@ -9,6 +9,8 @@ use alloc::vec::Vec;
 use crate::mm::address::VirtPageNum;
 use crate::mm::frame_allocator::FrameTracker;
 use bitflags::bitflags;
+use log::info;
+use crate::global::*;
 
 bitflags! {
 	pub struct MapPermission: u8 {
@@ -66,6 +68,56 @@ impl AddrSpace {
 
 	/// Create the kernel address space
 	pub fn new_kernel() -> Self {
+		let mut kernel_space = Self::new_bare();
+		print_kernel_mem();
+		// trampoline
+		kernel_space.map_trampoline();
+
+		// .text
+		kernel_space.push(VMArea::new(
+			(&raw const stext as usize).into(),
+			(&raw const etext as usize).into(),
+			MapType::Identical,
+			MapPermission::R | MapPermission::X,
+		), None);
+
+		// .rodata
+		kernel_space.push(VMArea::new(
+			(&raw const srodata as usize).into(),
+			(&raw const erodata as usize).into(),
+			MapType::Identical,
+			MapPermission::R,
+		), None);
+
+		// .data
+		kernel_space.push(VMArea::new(
+			(&raw const sdata as usize).into(),
+			(&raw const edata as usize).into(),
+			MapType::Identical,
+			MapPermission::R | MapPermission::W,
+		), None);
+
+		// .bss
+		kernel_space.push(VMArea::new(
+			(&raw const sbss as usize).into(),
+			(&raw const ebss as usize).into(),
+			MapType::Identical,
+			MapPermission::R | MapPermission::W,
+		), None);
+
+		// remain space
+		kernel_space.push(VMArea::new(
+			(&raw const ekernel as usize).into(),
+			(MEMORY_END as usize).into(),
+			MapType::Identical,
+			MapPermission::R | MapPermission::W,
+		), None);
+
+		info!("kernel mapping address space build complete");
+		kernel_space
+	}
+
+	pub fn map_trampoline(&mut self) {
 		todo!()
 	}
 
@@ -151,5 +203,20 @@ impl VMArea {
 			MapType::Identical => {},
 		}
 		pt_tree.unmap(vpn);
+	}
+}
+
+pub fn print_kernel_mem() {
+	unsafe {
+		info!("kernel memory map:");
+		info!("kernel base = {:<10p}", &skernel);
+		info!(".text      : [{:<10p}, {:<10p}]", &stext, &etext);
+		info!(".rodata    : [{:<10p}, {:<10p}]", &srodata, &erodata);
+		info!(".data      : [{:<10p}, {:<10p}]", &sdata, &edata);
+		info!(".bss.kstack: [{:<10p}, {:<10p}]", &skstack, &ekstack);
+		info!(".bss.ustack: [{:<10p}, {:<10p}]", &sustack, &eustack);
+		info!(".bss.heap  : [{:<10p}, {:<10p}]", &sheap, &eheap);
+		info!(".bss       : [{:<10p}, {:<10p}]", &sbss, &ebss);
+		info!("kernel end = {:<10p}", &ekernel);
 	}
 }
