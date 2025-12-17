@@ -2,7 +2,8 @@ use alloc::vec::Vec;
 use alloc::vec;
 use bitflags::bitflags;
 
-use crate::{config::PAGE_SIZE, global::FRAME_ALLOCATOR, mm::{address::{PhysAddr, PhysPageNum, VirtPageNum}, frame_allocator::{FrameAllocator, FrameTracker}}};
+use crate::{config::PAGE_SIZE, global::FRAME_ALLOCATOR, mm::{address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum}, frame_allocator::{FrameAllocator, FrameTracker}}};
+use alloc::collections::BTreeMap;
 
 const PAGE_ENTRY_NUMBER: usize = PAGE_SIZE / size_of::<PageTableEntry>(); //it will be 512 entry
 
@@ -26,7 +27,8 @@ bitflags! {
 pub struct PageTableTree {
 	root_ppn: PhysPageNum,
 	//for RAII
-	frame_nodes: Vec<FrameTracker>
+	frame_nodes: Vec<FrameTracker>,
+	data_frames: BTreeMap<VirtPageNum, FrameTracker>,
 }
 
 
@@ -49,23 +51,50 @@ impl PageTableTree {
 		Self { 
 			root_ppn: root_ppn.ppn,
 			frame_nodes: vec![root_ppn],
+			data_frames: BTreeMap::new(),
 		}
 	}
 
-	pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+	pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags, frames: Option<FrameTracker>) {
 		let pte = self.find_pte_create(vpn);
 		assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn.0);
 		*pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
+		if let Some(frame) = frames { 
+			self.data_frames.insert(vpn, frame);
+		}
 	}
 
 	pub fn unmap(&mut self, vpn: VirtPageNum) {
 		let pte = self.find_pte(vpn).expect("vpn has not be mapped bufore");
 		assert!(pte.is_valid(), "vpn {:?} is invalid before unmapping", vpn.0);
 		*pte = PageTableEntry::EMPTY;
+		self.data_frames.remove_entry(&vpn);
 	}
 
 	pub fn translate(root: PhysPageNum, vpn: VirtPageNum) -> Option<PageTableEntry>{
 		Self::walk(root, vpn, |_e: &mut PageTableEntry| {}).cloned()
+	}
+
+	// only be called in framed area
+	pub fn translate_vpn(&self, vpn: VirtPageNum) -> Option<PhysPageNum> {
+		if let Some(frame) = self.data_frames.get(&vpn) {
+			Some(frame.ppn)
+		} else {
+			None
+		}
+	}
+
+	// only be called in framed area
+	pub fn translate_vaddr(&self, vaddr: VirtAddr) -> Option<PhysAddr> {
+		let vpn: VirtPageNum = vaddr.vpn_floor();
+		if let Some(ppn) = self.translate_vpn(vpn) {
+			let base: VirtAddr = vpn.into();
+			let offset = vaddr.0 - base.0;
+			let paddr: PhysAddr = ppn.into();
+			Some((paddr.0 + offset).into())
+		} else {
+			None
+		}
 	}
 
 	//helper function

@@ -130,12 +130,12 @@ impl ElfInfo {
 				let offset = dst_start.byte_add(entry.r_offset as usize) as *mut usize;
 				let append = dst_start.byte_add(entry.r_addend as usize) as usize;
 				*offset = append;
-				ARCH.fencei();
 			}
 
 		}
 
 		unsafe {
+			ARCH.fencei();
 			dst_start..dst_start.byte_add(real_size as usize)
 		}
 	}
