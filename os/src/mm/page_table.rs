@@ -1,8 +1,9 @@
 use alloc::vec::Vec;
 use alloc::vec;
 use bitflags::bitflags;
+use riscv::{asm::sfence_vma, register::satp::{self, Satp}};
 
-use crate::{config::PAGE_SIZE, global::FRAME_ALLOCATOR, mm::{address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum}, frame_allocator::{FrameAllocator, FrameTracker}}};
+use crate::{config::PAGE_SIZE, global::FRAME_ALLOCATOR, mm::{address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum}, frame_allocator::{FrameAllocator, FrameTracker}}, println};
 use alloc::collections::BTreeMap;
 
 const PAGE_ENTRY_NUMBER: usize = PAGE_SIZE / size_of::<PageTableEntry>(); //it will be 512 entry
@@ -12,7 +13,7 @@ bitflags! {
 	#[derive(PartialEq)]
 	pub struct PTEFlags: u8 {
 		const V = 1 << 0;
-		const R = 1 << 1; 
+		const R = 1 << 1;
 		const W = 1 << 2;
 		const X = 1 << 3;
 		const U = 1 << 4;
@@ -25,7 +26,7 @@ bitflags! {
 // PageTableTree
 // Record the root PageTableNode location
 pub struct PageTableTree {
-	root_ppn: PhysPageNum,
+	pub root_ppn: PhysPageNum,
 	//for RAII
 	frame_nodes: Vec<FrameTracker>,
 	data_frames: BTreeMap<VirtPageNum, FrameTracker>,
@@ -48,7 +49,7 @@ pub struct PageTableEntry {
 impl PageTableTree {
 	pub fn new() -> Self {
 		let root_ppn = FRAME_ALLOCATOR.get().unwrap().frame_alloc().unwrap();
-		Self { 
+		Self {
 			root_ppn: root_ppn.ppn,
 			frame_nodes: vec![root_ppn],
 			data_frames: BTreeMap::new(),
@@ -59,7 +60,7 @@ impl PageTableTree {
 		let pte = self.find_pte_create(vpn);
 		assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn.0);
 		*pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
-		if let Some(frame) = frames { 
+		if let Some(frame) = frames {
 			self.data_frames.insert(vpn, frame);
 		}
 	}
@@ -71,8 +72,21 @@ impl PageTableTree {
 		self.data_frames.remove_entry(&vpn);
 	}
 
-	pub fn translate(root: PhysPageNum, vpn: VirtPageNum) -> Option<PageTableEntry>{
-		Self::walk(root, vpn, |_e: &mut PageTableEntry| {}).cloned()
+	//TODO: arch satp format
+	pub fn token(&self) -> usize {
+ 	       8usize << 60 | self.root_ppn.0
+    	}
+
+	pub fn activate_token(&self) {
+		unsafe {
+			satp::set(satp::Mode::Sv39, 0, self.root_ppn.0);
+			sfence_vma(0, 0);
+		}
+
+	}
+
+	pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry>{
+		Self::walk(self.root_ppn, vpn, |_e: &mut PageTableEntry| {}).cloned()
 	}
 
 	// only be called in framed area
@@ -100,7 +114,7 @@ impl PageTableTree {
 	//helper function
 	// walk in this tree and return the entry point to pframe
 	fn walk<F>(root_ppn: PhysPageNum, vpn: VirtPageNum, mut on_missing: F) -> Option<&'static mut PageTableEntry>
-	where 
+	where
 		F: FnMut(&mut PageTableEntry)
 	{
 		let vpn_idxs = vpn.indexes();
@@ -108,8 +122,8 @@ impl PageTableTree {
 
 		for &idx in &vpn_idxs[0..2] {
 			//SAFETY: need to guarantee mut PageTableTree only to access in one hart per time
-			let e = unsafe { 
-				node.get_pte_node().entry_mut(idx) 
+			let e = unsafe {
+				node.get_pte_node().entry_mut(idx)
 			};
 
 			// when missing
@@ -123,8 +137,8 @@ impl PageTableTree {
 			// walk
 			node = e.ppn();
 		}
-		Some(unsafe { 
-			node.get_pte_node().entry_mut(vpn_idxs[2]) 
+		Some(unsafe {
+			node.get_pte_node().entry_mut(vpn_idxs[2])
 		})
 	}
 
@@ -164,20 +178,20 @@ impl PageTableNode {
 
 //TODO:riscv specific
 impl PageTableEntry {
-	pub const EMPTY: PageTableEntry = 
-		PageTableEntry { 
-			bits: 0 
+	pub const EMPTY: PageTableEntry =
+		PageTableEntry {
+			bits: 0
 		};
-	
+
 	pub fn new(ppn: PhysPageNum, flags: PTEFlags) -> Self {
 		PageTableEntry {
 			bits: ppn.0 << 10 | flags.bits() as usize
-		}	
+		}
 	}
 
 	pub fn ppn(&self) -> PhysPageNum {
-		((self.bits >> 10) & (1usize << 44 - 1)).into()
-	}
+        	(self.bits >> 10 & ((1usize << 44) - 1)).into()
+    	}
 
 	pub fn flags(&self) -> PTEFlags {
 		PTEFlags::from_bits(self.bits as u8).unwrap()
@@ -185,6 +199,18 @@ impl PageTableEntry {
 
 	pub fn is_valid(&self) -> bool {
 		(self.flags() & PTEFlags::V) != PTEFlags::empty()
+	}
+
+	pub fn readable(&self) -> bool {
+		(self.flags() & PTEFlags::R) != PTEFlags::empty()
+	}
+
+	pub fn writable(&self) -> bool {
+		(self.flags() & PTEFlags::W) != PTEFlags::empty()
+	}
+
+	pub fn executable(&self) -> bool {
+		(self.flags() & PTEFlags::X) != PTEFlags::empty()
 	}
 
 }

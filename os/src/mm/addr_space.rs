@@ -1,18 +1,13 @@
-use core::ops::Range;
-
-use crate::arch::riscv::entry;
-use crate::config::{self, APP_VIRT_ADDR, MEMORY_END, PAGE_SIZE, USER_STACK_SIZE};
+use crate::config::{APP_VIRT_ADDR, MEMORY_END, PAGE_SIZE, USER_STACK_SIZE};
 use crate::global::FRAME_ALLOCATOR;
 use crate::mm::address::{PhysPageNum, VPNRange, VirtAddr};
-use crate::mm::page_table::{self, PTEFlags, PageTableTree};
-use alloc::collections::BTreeMap;
+use crate::mm::page_table::{PTEFlags, PageTableTree};
 use alloc::vec::Vec;
 use elf::abi::{ET_DYN, PF_R, PF_W, PF_X};
 use crate::mm::address::VirtPageNum;
-use crate::mm::frame_allocator::FrameTracker;
 use bitflags::bitflags;
 use log::info;
-use crate::global::*;
+use crate::{global::*, println};
 use elf::{
 	ElfBytes,
 	abi::{PT_LOAD, R_RISCV_RELATIVE},
@@ -78,7 +73,7 @@ impl AddrSpace {
 		let mut kernel_space = Self::new_bare();
 		print_kernel_mem();
 		// trampoline
-		kernel_space.map_trampoline();
+		//kernel_space.map_trampoline();
 
 		// .text
 		kernel_space.push(VMArea::new(
@@ -119,6 +114,16 @@ impl AddrSpace {
 			MapType::Identical,
 			MapPermission::R | MapPermission::W,
 		), None);
+
+		// mmio space
+		PLATFORM.get().unwrap().board_info.get_all_ranges().iter().for_each(|range| {
+			kernel_space.push(VMArea::new(
+				range.start.into(),
+				range.end.into(),
+				MapType::Identical,
+				MapPermission::R | MapPermission::W,
+			), None);
+		});
 
 		info!("kernel mapping address space build complete");
 		kernel_space
@@ -204,6 +209,10 @@ impl AddrSpace {
 		//TODO: TrapContext
 
 		(user_space, user_stack_va_end.0, entry_point)
+	}
+
+	pub fn activate(&self) {
+		self.page_table.activate_token();
 	}
 
 }
@@ -296,7 +305,37 @@ pub fn print_kernel_mem() {
 		info!(".bss.kstack: [{:<10p}, {:<10p}]", &skstack, &ekstack);
 		info!(".bss.ustack: [{:<10p}, {:<10p}]", &sustack, &eustack);
 		info!(".bss.heap  : [{:<10p}, {:<10p}]", &sheap, &eheap);
-		info!(".bss       : [{:<10p}, {:<10p}]", &sbss, &ebss);
+		info!(".bss       : [{:<10p}, {:<10p}]", &sbss_nostack, &ebss);
 		info!("kernel end = {:<10p}", &ekernel);
+		let console = PLATFORM.get().unwrap().board_info.console.as_ref().unwrap();
+		info!("console    : [{:<10x}, {:<10x}]", console.range.start, console.range.end);
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	#[test_case]
+	pub fn remap_test() {
+		unsafe {
+			let mut kernel_space = KERNEL_ADDRSPACE.get().unwrap();
+			let mid_text: VirtAddr = ((&stext as *const _ as usize + &etext as *const _ as usize) / 2).into();
+			let mid_rodata: VirtAddr = ((&srodata as *const _ as usize + &erodata as *const _ as usize) / 2).into();
+			let mid_data: VirtAddr = ((&sdata as *const _ as usize + &edata as *const _ as usize) / 2).into();
+			assert_eq!(
+				kernel_space.page_table.translate(mid_text.vpn_floor()).unwrap().writable(),
+				false
+			);
+			assert_eq!(
+				kernel_space.page_table.translate(mid_rodata.vpn_floor()).unwrap().writable(),
+				false,
+			);
+			assert_eq!(
+				kernel_space.page_table.translate(mid_data.vpn_floor()).unwrap().executable(),
+				false,
+			);
+			println!("remap_test passed!");
+		}
 	}
 }

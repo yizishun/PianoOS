@@ -1,3 +1,4 @@
+use crate::mm::addr_space::AddrSpace;
 use crate::mm::frame_allocator::{FrameAllocator, StackFrameAllocator};
 use crate::task::TaskManager;
 use crate::config::{MAX_APP_NUM, NUM_HART_MAX};
@@ -23,6 +24,7 @@ unsafe extern "C" {
 	pub static sheap: usize;
 	pub static eheap: usize;
 	pub static sbss: usize;
+	pub static sbss_nostack: usize;
 	pub static ebss: usize;
 	pub static ekernel: usize;
 
@@ -37,6 +39,8 @@ pub static TASK_MANAGER: Once<TaskManager> = Once::new();
 pub static LOADER: Once<Loader> = Once::new();
 
 pub static FRAME_ALLOCATOR: Once<FrameAllocator> = Once::new();
+
+pub static KERNEL_ADDRSPACE: Once<AddrSpace> = Once::new();
 
 #[unsafe(link_section = ".bss.kstack")]
 pub static mut KERNEL_STACK: [KernelStack; NUM_HART_MAX] = [KernelStack::ZERO; NUM_HART_MAX];

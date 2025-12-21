@@ -63,26 +63,18 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	info!("boot hartid: {}", hartid);
 	info!("device tree addr: {:p}", device_tree as *const u8);
 	PLATFORM.get().unwrap().print_platform_info();
-	crate::mm::addr_space::print_kernel_mem();
 
-	// init frame allocator
-	FRAME_ALLOCATOR.call_once(|| FrameAllocator::new(Box::new(
-		{
-			// use StackFrameAllocator at first
-			let mut stack = StackFrameAllocator::new();
-			stack.init_scope();
-			stack
-		}
-	)));
-	
+	// init mm
+	mm::init();
+
 	// get elf info and init loader
 	LOADER.call_once(|| Loader::new());
 	LOADER.get().unwrap().print_app_info();
 	// elf load happen in this func
-	TASK_MANAGER.call_once(|| 
+	TASK_MANAGER.call_once(||
 		TaskManager::new()
 	);
-	let next_app = 
+	let next_app =
 		//init HartContext, TrapContext, TaskContext
 		TASK_MANAGER.get().unwrap().prepare_next_at_boot(hartid);
 
@@ -112,7 +104,7 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 
 #[unsafe(no_mangle)]
 extern "C" fn hart_main(hartid: usize, _opaque: usize) -> ! {
-	let next_app = 
+	let next_app =
 		//init HartContext, TrapContext, TaskContext
 		TASK_MANAGER.get().unwrap().prepare_next_at_boot(hartid);
 
@@ -126,7 +118,7 @@ extern "C" fn hart_main(hartid: usize, _opaque: usize) -> ! {
 
 fn clear_bss() {
 	unsafe {
-		let mut ptr = &raw const sbss as *mut u8;
+		let mut ptr = &raw const sbss_nostack as *mut u8;
 		let end = &raw const ebss as *mut u8;
 		while ptr < end {
 			ptr.write_volatile(0);

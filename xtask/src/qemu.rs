@@ -87,6 +87,8 @@ pub fn run(arg: &QemuArg) -> Option<ExitStatus> {
 	cmd.arg("-machine").arg(&arg.machine)
 		.arg("-smp").arg(arg.smp.to_string())
 		.arg("-bios").arg(&arg.bios)
+		.args(["-d", "mmu,int"])
+		.args(["-D", "qemu.log"])
 		.args([
 			"-device",
 			&format!("loader,file={},addr={}", bin_path.display(), base_addr),

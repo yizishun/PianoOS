@@ -1,3 +1,5 @@
+use core::ops::Range;
+
 use crate::console::ConsoleDevice;
 use crate::console::ConsoleType;
 use crate::console::KernelConsole;
@@ -10,25 +12,49 @@ use crate::driver::chardev::uart16550::Uart16550Wrapper;
 use crate::error::KernelError;
 
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use log::info;
 use serde_device_tree::buildin::Node;
 use spin::mutex::Mutex;
 
 pub type BaseAddr = usize;
 
+pub struct DeviceInfo<T> {
+	pub range: Range<usize>,
+	pub devtype: T
+}
+
+impl<T> DeviceInfo<T> {
+	pub fn new(range: Range<usize>, devtype: T) -> Self {
+		DeviceInfo {
+			range, devtype
+		}
+	}
+}
+
 pub struct BoardInfo {
 	pub cpu_num: Option<usize>,
 	pub cpu_freq: Option<usize>,
-	pub console: Option<(BaseAddr, ConsoleType)>,
+	pub console: Option<DeviceInfo<ConsoleType>>,
 }
 
 impl BoardInfo {
 	pub const fn new() -> BoardInfo {
-		BoardInfo { 
+		BoardInfo {
 			cpu_num: None,
 			cpu_freq: None,
 			console: None
 		}
+	}
+
+	pub fn get_all_ranges(&self) -> Vec<Range<usize>> {
+		let mut ranges = Vec::new();
+
+		if let Some(console) = &self.console {
+			ranges.push(console.range.clone());
+		}
+
+		ranges
 	}
 }
 
@@ -77,7 +103,7 @@ impl Platform {
 	}
 
 	fn init_console_info(root: &Node)
-			     -> Result<Option<(BaseAddr, ConsoleType)>, ParseDeviceTreeError>
+			     -> Result<Option<DeviceInfo<ConsoleType>>, ParseDeviceTreeError>
 	{
 		let Some(stdout_path) = root.chosen_stdout_path() else {
 			return Err(ParseDeviceTreeError::NoStdout);
@@ -90,7 +116,7 @@ impl Platform {
 		};
 		Ok(compat.iter()
 			 .find_map(|dev| ConsoleType::compatible(dev))
-			 .map(|ctype| (reg.start, ctype)))
+			 .map(|ctype| DeviceInfo::new(reg, ctype)))
 	}
 
 	fn init_board_device(board_info: &BoardInfo) -> BoardDevice {
@@ -100,12 +126,12 @@ impl Platform {
 	}
 
 	fn init_console(board_info: &BoardInfo) -> Option<KernelConsole> {
-		let Some((base, console_type)) = board_info.console else {
+		let Some(DeviceInfo{ range, devtype }) = &board_info.console else {
 			return None;
 		};
-		let console: Box<dyn ConsoleDevice> = match console_type {
-			ConsoleType::Uart16550U8 => Box::new(Uart16550Wrapper::<u8>::new(base)),
-			ConsoleType::Uart16550U32 => Box::new(Uart16550Wrapper::<u32>::new(base)),
+		let console: Box<dyn ConsoleDevice> = match devtype {
+			ConsoleType::Uart16550U8 => Box::new(Uart16550Wrapper::<u8>::new(range.start)),
+			ConsoleType::Uart16550U32 => Box::new(Uart16550Wrapper::<u32>::new(range.start)),
 			ConsoleType::RiscvSbi => Box::new(RiscvSbi),
 		};
 		Some(KernelConsole::new(Mutex::new(console)))
@@ -114,8 +140,10 @@ impl Platform {
 	pub fn print_platform_info(&self) {
 		info!("cpu number: {}", self.board_info.cpu_num.unwrap());
 		info!("cpu freq: {}", self.board_info.cpu_freq.unwrap());
-		info!("uart type is {:#?}, base addr is 0x{:X}",
-		      self.board_info.console.unwrap().1,
-		      self.board_info.console.unwrap().0)
+		info!("uart type is {:#?}, addr is 0x{:X} - 0x{:X}",
+		      self.board_info.console.as_ref().unwrap().devtype,
+		      self.board_info.console.as_ref().unwrap().range.start,
+		      self.board_info.console.as_ref().unwrap().range.end
+		)
 	}
 }

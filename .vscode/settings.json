@@ -11,6 +11,11 @@
       "float",
       "nested_trap",
    ],
+   "rust-analyzer.cargo.cfgs": [
+      "debug_assertions",
+      "miri",
+      "test",
+   ],
    "editor.tabSize": 8,
    "editor.insertSpaces": false,
    "editor.formatOnSave": false,
