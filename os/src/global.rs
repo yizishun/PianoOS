@@ -2,7 +2,7 @@ use crate::mm::addr_space::AddrSpace;
 use crate::mm::frame_allocator::{FrameAllocator, StackFrameAllocator};
 use crate::task::TaskManager;
 use crate::config::{MAX_APP_NUM, NUM_HART_MAX};
-use crate::loader::Loader;
+use crate::elfInfo::ElfsInfo;
 use crate::mm::stack::{KernelStack, UserStack};
 use crate::platform::Platform;
 use crate::arch::common::Arch;
@@ -27,6 +27,7 @@ unsafe extern "C" {
 	pub static sbss_nostack: usize;
 	pub static ebss: usize;
 	pub static ekernel: usize;
+	pub static strampoline: usize;
 
 	// in app link asm
 	pub static _num_app: usize;
@@ -36,7 +37,7 @@ pub static PLATFORM: Once<Platform> = Once::new();
 
 pub static TASK_MANAGER: Once<TaskManager> = Once::new();
 
-pub static LOADER: Once<Loader> = Once::new();
+pub static ELFS_INFO: Once<ElfsInfo> = Once::new();
 
 pub static FRAME_ALLOCATOR: Once<FrameAllocator> = Once::new();
 

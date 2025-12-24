@@ -45,6 +45,7 @@ pub extern "C" fn fast_handler_user(
 	let save_regs = |ctx: &mut FastContext| {
 		ctx.regs().a = [ctx.a0(), a1, a2, a3, a4, a5, a6, a7];
 	};
+	//TODO: translate ctx to get the real ctx
 	ctx.tasks().app_info().user_time.end();
 	ctx.tasks().app_info().kernel_time.start();
 
@@ -60,7 +61,7 @@ pub extern "C" fn fast_handler_user(
 		let stack = alloc(stack_layout) as *mut KernelStack;
 		let flow_context = alloc(flow_context_layout) as *mut FlowContext;
 		forget((*stack).load_as_stack(
-			hart_context_in_trap_stage().hartid(), 
+			hart_context_in_trap_stage().hartid(),
 			NonNull::new_unchecked(flow_context),
 			<Arch as ArchTrap>::fast_handler_kernel,
 			stack_drop));
@@ -69,7 +70,7 @@ pub extern "C" fn fast_handler_user(
 	match scause.cause()
 		.try_into::<riscv::interrupt::Interrupt, riscv::interrupt::supervisor::Exception>()
 		.unwrap() {
-		
+
 		Trap::Interrupt(Interrupt::SupervisorTimer) => {
 			save_regs(&mut ctx);
 			ctx.continue_with(timer_handler, ())
@@ -81,7 +82,7 @@ pub extern "C" fn fast_handler_user(
 		}
 		Trap::Exception(Exception::StoreFault) |
 		Trap::Exception(Exception::StorePageFault) |
-		Trap::Exception(Exception::LoadFault) | 
+		Trap::Exception(Exception::LoadFault) |
 		Trap::Exception(Exception::LoadMisaligned) => {
 			warn!("PageFault in application, kernel killed it.");
 			warn!("Illegal addr: 0x{:x}", stval);
@@ -131,20 +132,20 @@ pub extern "C" fn fast_handler_kernel(
 	match scause.cause()
 		.try_into::<riscv::interrupt::Interrupt, riscv::interrupt::supervisor::Exception>()
 		.unwrap() {
-		
+
 		Trap::Interrupt(Interrupt::SupervisorTimer) => {
 			//TODO: do something useful
 			save_regs(&mut ctx);
 			//println!("Kernel recieve timer intrrupt");
-			ARCH.set_next_timer_intr(TICK_MS);	
+			ARCH.set_next_timer_intr(TICK_MS);
 			ctx.nested_restore()
 		}
 
 		Trap::Exception(Exception::StoreFault) |
 		Trap::Exception(Exception::StorePageFault) |
-		Trap::Exception(Exception::LoadFault) | 
+		Trap::Exception(Exception::LoadFault) |
 		Trap::Exception(Exception::LoadMisaligned) => {
-			panic!("PageFault in kernel, kernel panic.\n Illegal addr: 0x{:x}\n, excption pc: 0x{:x}\n", 
+			panic!("PageFault in kernel, kernel panic.\n Illegal addr: 0x{:x}\n, excption pc: 0x{:x}\n",
 				stval,
 				sepc
 			);
@@ -156,7 +157,7 @@ pub extern "C" fn fast_handler_kernel(
 		Trap::Exception(Exception::InstructionFault) |
 		Trap::Exception(Exception::InstructionMisaligned) |
 		Trap::Exception(Exception::InstructionPageFault) => {
-			panic!("Instruction PageFault in kernel, kernel panic.\n Illegal addr: 0x{:x}\n, excption pc: 0x{:x}\n", 
+			panic!("Instruction PageFault in kernel, kernel panic.\n Illegal addr: 0x{:x}\n, excption pc: 0x{:x}\n",
 				stval,
 				sepc
 			);

@@ -1,15 +1,14 @@
-use core::ops::Range;
-use core::ptr::{NonNull, null};
+use core::ptr::NonNull;
 use core::sync::atomic::Ordering;
 use core::intrinsics::forget;
-use core::{array, num};
+use core::array;
 
 use log::info;
 use spin::mutex::Mutex;
 
-use crate::global::{ARCH, KERNEL_STACK, LOADER};
+use crate::global::{ARCH, ELFS_INFO, KERNEL_STACK, TASK_MANAGER};
 use crate::arch::common::{Arch, ArchPower, ArchTime, ArchTrap, FlowContext};
-use crate::config::{MAX_APP_NUM, TICK_MS};
+use crate::config::{FLOW_CONTEXT_VADDR, MAX_APP_NUM, TICK_MS, TRAMPOLINE_VADDR, TRAP_HANDLER_VADDR};
 use crate::harts::{task_context_in_trap_stage, trap_handler_in_trap_stage};
 use crate::task::block::TaskControlBlock;
 use crate::task::status::{ReadyLevel, TaskStatus};
@@ -20,9 +19,8 @@ pub mod status;
 
 pub struct TaskManager {
 	pub num_app: usize,
-	pub app_range: [Range<*const u8>; MAX_APP_NUM],
 	finished: Mutex<bool>,
-	tasks: [TaskControlBlock; MAX_APP_NUM] 
+	tasks: [TaskControlBlock; MAX_APP_NUM]
 }
 
 unsafe impl Send for TaskManager {}
@@ -30,47 +28,45 @@ unsafe impl Sync for TaskManager {}
 
 impl TaskManager {
 	pub fn new() -> Self {
-		let num_app = LOADER.get().unwrap().num_app;
-		// load app and init app_range
-		let app_range: [Range<*const u8>; MAX_APP_NUM] = 
-			array::from_fn(|i| {
-				if i < num_app {
-					LOADER.get().unwrap()
-						.load(i)
-				} else {
-					Range { start: null(), end:  null()}
-				}
-			});
-		// init kernel stacks and taskControlBlocks
-		let tasks: [TaskControlBlock; MAX_APP_NUM] = 
+		let num_app = ELFS_INFO.get().unwrap().num_app;
+		let tasks: [TaskControlBlock; MAX_APP_NUM] =
 			array::from_fn(|i| {
 				if i < num_app {
 					TaskControlBlock::new(
-						i, 
-						app_range[i].start as usize, 
-						app_range[i].end as usize,
-						TaskStatus::Ready(ReadyLevel::High))
+						i,
+						TaskStatus::Ready(ReadyLevel::High),
+						Some(ELFS_INFO.get().unwrap().elf_info(i))
+					)
 				} else {
-					TaskControlBlock::new(i, 0, 0, TaskStatus::Exited)
+					TaskControlBlock::new(
+						i,
+						TaskStatus::Exited,
+						None
+					)
 				}
 			});
-		TaskManager { 
+		TaskManager {
 			num_app: num_app,
 			finished: Mutex::new(false),
-			app_range,
 			tasks
 		}
 	}
 
+	pub fn map_flow_context(&self) {
+		self.tasks.iter().for_each(|tcb| {
+			// self ref
+			tcb.addr_space().insert_uflow_context(
+				(&tcb.flow_context as *const _ as usize).into()
+			);
+		});
+	}
+
 	pub fn app_size(&self, app_id: usize) -> usize {
-		let app_range = self.app_range.get(app_id).unwrap();
-		let start = app_range.start as usize;
-		let end = app_range.end as usize;
-		end - start
+		self.tasks[app_id].base_size
 	}
 
 	pub fn check_end(&self) {
-		let all_finished = 
+		let all_finished =
 			self.tasks.iter().take(self.num_app)
 				.all(|f| f.status() == TaskStatus::Exited);
 		if all_finished {
@@ -114,33 +110,47 @@ impl TaskManager {
 
 	pub fn prepare_next_at_boot(&self, hartid: usize) -> usize {
 		let next_app = self.find_next_ready_and_set_run();
+		let next_tcb = &self.tasks[next_app];
 		let next_flow_context = unsafe {
 			NonNull::new_unchecked((&self.tasks[next_app]).flow_context.get() as *mut _)
 		};
-		let next_app_range = &self.app_range[next_app];
-		
-		// init trap stack, task context, hart context and bind to an app
-		unsafe {
+		//TODO: use next_flow_context translated result
+		let next_flow_context_va = unsafe {
+			NonNull::new_unchecked(FLOW_CONTEXT_VADDR as *mut _)
+		};
+
+		// link kernel stack to user app
+		let kstack = unsafe {
 			#[allow(static_mut_refs)]
-			forget(KERNEL_STACK.get_mut(hartid).unwrap()
-				.load_as_stack(
-					hartid, 
-					next_flow_context, 
+			KERNEL_STACK.get_mut(hartid).unwrap()
+				.init_trap_stack(
+					hartid,
+					next_flow_context_va,
 					<Arch as ArchTrap>::fast_handler_user,
 					|_| {}
-				));
-		}
-		// init sepc, sstatus, stvec, stie
-		<Arch as ArchTrap>::boot_handler(next_app_range.start as usize);
+				)
+		};
+
+		// link user app to kernel stack(traph)
+		//map traph
+		next_tcb.addr_space().insert_utrap_handler((*&kstack).kstack_ptr().into());
+		// init sepc, sstatus, stvec, stie, sscratch
+		<Arch as ArchTrap>::boot_handler(
+			next_tcb.flow_context().pc,
+			TRAMPOLINE_VADDR,
+			TRAP_HANDLER_VADDR, //TODO: use kstack translated result
+		);
+		forget(kstack);
 		next_app
 	}
 
 	pub fn run_next_at_boot(&self, next_app: usize) -> !{
 		ARCH.set_next_timer_intr(TICK_MS);
 		self.tasks.get(next_app).unwrap().app_info().user_time.start();
+		let sp = TASK_MANAGER.get().unwrap().tasks[next_app].flow_context().sp;
 		// init user stack and sret
 		unsafe {
-			<Arch as ArchTrap>::boot_entry(next_app)
+			<Arch as ArchTrap>::boot_entry(sp)
 		}
 	}
 
@@ -158,7 +168,7 @@ impl TaskManager {
 	}
 
 	pub fn exit_cur_and_run_next(&self) {
-		let app_id = task_context_in_trap_stage().app_info().cur_app;
+		let app_id = task_context_in_trap_stage().app_info().app_id;
 		let old_task_block = self.tasks.get(app_id).unwrap();
 		assert!(old_task_block.status() == TaskStatus::Running, "this task is not Running, something may be wrong");
 		old_task_block.app_info().kernel_time.end();
@@ -173,7 +183,7 @@ impl TaskManager {
 	}
 
 	pub fn suspend_cur_and_run_next(&self) {
-		let app_id = task_context_in_trap_stage().app_info().cur_app;
+		let app_id = task_context_in_trap_stage().app_info().app_id;
 		let old_task_block = self.tasks.get(app_id).unwrap();
 		assert!(old_task_block.status() == TaskStatus::Running, "this task is not Running, something may be wrong");
 		old_task_block.app_info().kernel_time.end();

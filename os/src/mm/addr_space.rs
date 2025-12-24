@@ -1,6 +1,6 @@
-use crate::config::{APP_VIRT_ADDR, MEMORY_END, PAGE_SIZE, USER_STACK_SIZE};
+use crate::config::{APP_VIRT_ADDR, FLOW_CONTEXT_VADDR, MEMORY_END, PAGE_SIZE, TRAMPOLINE_VADDR, TRAP_HANDLER_VADDR, USER_STACK_SIZE};
 use crate::global::FRAME_ALLOCATOR;
-use crate::mm::address::{PhysPageNum, VPNRange, VirtAddr};
+use crate::mm::address::{PhysAddr, PhysPageNum, VPNRange, VirtAddr};
 use crate::mm::page_table::{PTEFlags, PageTableTree};
 use alloc::vec::Vec;
 use elf::abi::{ET_DYN, PF_R, PF_W, PF_X};
@@ -50,6 +50,10 @@ impl AddrSpace {
 		}
 	}
 
+	pub fn root(&self) -> PhysPageNum {
+		self.page_table.root_ppn
+	}
+
 	/// Push a VMArea into the address space and optionally copy data
 	fn push(&mut self, mut vma: VMArea, data: Option<&[u8]>){
 		(&mut vma).map_all(&mut self.page_table);
@@ -68,12 +72,34 @@ impl AddrSpace {
 		self.push(vma, None);
 	}
 
+	pub fn insert_uflow_context(&mut self, flow: PhysAddr) -> VirtAddr {
+		//TODO: check flow is aligned
+		self.page_table.map(
+			FLOW_CONTEXT_VADDR.into(),
+			flow.ppn_floor(),
+			PTEFlags::R | PTEFlags::W,
+			None
+		);
+		FLOW_CONTEXT_VADDR.into()
+	}
+
+	pub fn insert_utrap_handler(&mut self, traph: PhysAddr) -> VirtAddr {
+		//TODO: check traph is aligned
+		self.page_table.map(
+			TRAP_HANDLER_VADDR.into(),
+			traph.ppn_floor(),
+			PTEFlags::R | PTEFlags::W,
+			None
+		);
+		TRAP_HANDLER_VADDR.into()
+	}
+
 	/// Create the kernel address space
 	pub fn new_kernel() -> Self {
 		let mut kernel_space = Self::new_bare();
 		print_kernel_mem();
 		// trampoline
-		//kernel_space.map_trampoline();
+		kernel_space.map_trampoline(TRAMPOLINE_VADDR.into());
 
 		// .text
 		kernel_space.push(VMArea::new(
@@ -129,8 +155,14 @@ impl AddrSpace {
 		kernel_space
 	}
 
-	pub fn map_trampoline(&mut self) {
-		todo!()
+	pub fn map_trampoline(&mut self, vpn: VirtPageNum) {
+		// we dont need vma because we dont use FrameAllocator
+		self.page_table.map(
+			vpn,
+			(&raw const strampoline as usize).into(),
+			PTEFlags::R | PTEFlags::X,
+			None,
+		);
 	}
 
 	/// Create address space from ELF, returning (self, user_sp, entry_point)
@@ -139,7 +171,7 @@ impl AddrSpace {
 		let mut user_space = Self::new_bare();
 
 		// trampoline
-		user_space.map_trampoline();
+		user_space.map_trampoline(TRAMPOLINE_VADDR.into());
 
 		// parse elf into ElfBytes
 		let file = ElfBytes::<AnyEndian>::minimal_parse(elf_data).unwrap();

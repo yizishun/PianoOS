@@ -14,6 +14,9 @@ const _: () = assert!(KERNEL_STACK_SIZE % core::mem::align_of::<HartContext>() =
 #[repr(C, align(128))]
 pub struct HartContext {
 	hartid: usize,
+	// for switch addr space
+	kaddr_space: usize,
+	ksp: usize,
 }
 
 impl HartContext {

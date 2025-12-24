@@ -2,27 +2,49 @@ use core::sync::atomic::AtomicU8;
 use core::sync::atomic::Ordering;
 use core::cell::SyncUnsafeCell;
 use crate::arch::common::FlowContext;
+use crate::global::TASK_MANAGER;
+use crate::mm::addr_space::AddrSpace;
 use crate::task::status::ReadyLevel;
 use crate::task::status::TaskStatus;
 use crate::task::harts::AppHartInfo;
 
 //TODO: 最好做成可分配可回收的结构
+#[repr(C, align(4096))]
 pub struct TaskControlBlock {
 	// SAFETY: one flow_context will only bind to one harts
 	pub flow_context: SyncUnsafeCell<FlowContext>,
 	pub task_status: AtomicU8,
-	app_info: SyncUnsafeCell<AppHartInfo>
+	app_info: SyncUnsafeCell<AppHartInfo>,
+	pub addr_space: SyncUnsafeCell<AddrSpace>,
+	pub base_size: usize
 }
 
 impl TaskControlBlock {
-	pub fn new(app_id: usize, start_addr: usize, end_addr: usize, status: TaskStatus) -> Self {
+	pub fn new(
+		app_id: usize,
+		status: TaskStatus,
+		elf_data: Option<&[u8]>,
+	) -> Self {
 		let task_status = AtomicU8::new(u8::from(status));
-		let app_info = SyncUnsafeCell::new(AppHartInfo::new(app_id, start_addr, end_addr));
-		let flow_context= SyncUnsafeCell::new(FlowContext::new(app_id, start_addr));
-		Self {
-			flow_context,
-			task_status, 
-			app_info
+		if elf_data == None {
+			return Self {
+				flow_context: SyncUnsafeCell::new(FlowContext::ZERO),
+				task_status,
+				app_info: SyncUnsafeCell::new(AppHartInfo::ZERO),
+				addr_space: SyncUnsafeCell::new(AddrSpace::new_bare()),
+				base_size: 0
+			};
+		} else {
+			let (u_addr_space, u_sp, u_entry) = AddrSpace::from_elf(elf_data.unwrap());
+			let app_info = SyncUnsafeCell::new(AppHartInfo::new(app_id, elf_data.unwrap().as_ptr_range()));
+			let flow_context= SyncUnsafeCell::new(FlowContext::new(u_sp, u_entry, u_addr_space.root().0));
+			Self {
+				flow_context, //lack utraph
+				task_status,
+				app_info,
+				addr_space: SyncUnsafeCell::new(u_addr_space), //lack the map of utraph and uflow
+				base_size: u_sp
+			}
 		}
 	}
 
@@ -43,6 +65,12 @@ impl TaskControlBlock {
 			.unwrap()
 	}
 
+	pub fn addr_space(&self) -> &mut AddrSpace {
+		unsafe {
+			&mut (*self.addr_space.get())
+		}
+	}
+
 	pub fn mark_suspend_low(&self) {
 		self.task_status.store(u8::from(TaskStatus::Ready(ReadyLevel::Low)), Ordering::Release);
 	}
@@ -50,7 +78,7 @@ impl TaskControlBlock {
 	pub fn mark_suspend_high_cas(&self, cur: TaskStatus) {
 		let _ = self.task_status.compare_exchange(
 			u8::from(cur),
-			u8::from(TaskStatus::Ready(ReadyLevel::High)), 
+			u8::from(TaskStatus::Ready(ReadyLevel::High)),
 			Ordering::Acquire,
 			Ordering::Relaxed
 		);

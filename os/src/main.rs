@@ -19,7 +19,7 @@ use log::info;
 use crate::arch::common::ArchPower;
 use crate::arch::common::ArchHarts;
 use crate::global::*;
-use crate::loader::Loader;
+use crate::elfInfo::ElfsInfo;
 use crate::logging::PIANOLOGGER;
 use crate::logging::PianoLogger;
 use crate::mm::frame_allocator::FrameAllocator;
@@ -43,7 +43,7 @@ mod platform;
 mod trap;
 mod harts;
 mod syscall;
-mod loader;
+mod elfInfo;
 mod test;
 
 extern crate alloc;
@@ -68,15 +68,18 @@ extern "C" fn rust_main(hartid: usize, device_tree: usize) -> ! {
 	mm::init();
 
 	// get elf info and init loader
-	LOADER.call_once(|| Loader::new());
-	LOADER.get().unwrap().print_app_info();
-	// elf load happen in this func
+	ELFS_INFO.call_once(|| ElfsInfo::new());
+	ELFS_INFO.get().unwrap().print_app_info();
+	// elf load and map
 	TASK_MANAGER.call_once(||
 		TaskManager::new()
 	);
-	let next_app =
-		//init HartContext, TrapContext, TaskContext
-		TASK_MANAGER.get().unwrap().prepare_next_at_boot(hartid);
+	// map flow context to user space
+	TASK_MANAGER.get().unwrap()
+		.map_flow_context();
+	// map trap handler to user space, link hart and app
+	let next_app =TASK_MANAGER.get().unwrap()
+		.prepare_next_at_boot(hartid);
 
 	//test
 	#[cfg(test)]

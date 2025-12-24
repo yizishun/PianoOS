@@ -58,7 +58,7 @@ pub trait ArchTrap {
 	// app boot entry
 	unsafe extern "C" fn boot_entry(a0: usize) -> !;
 	// app boot prepare
-	extern "C" fn boot_handler(start_addr: usize);
+	extern "C" fn boot_handler(entry: usize, trampoline: usize, utraph: usize);
 }
 
 #[cfg(target_arch = "riscv64")]

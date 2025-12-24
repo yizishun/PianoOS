@@ -26,12 +26,12 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
 
 fn check_buf_valid(buf: *const u8, len: usize) -> bool {
 	let app_info = task_context_in_trap_stage().app_info();
-	let cur_app = app_info.cur_app;
+	let cur_app = app_info.app_id;
 	let app_size = TASK_MANAGER.get().unwrap().app_size(cur_app);
 
 	let app_range = app_info.app_range.clone();
 	let app_stack_range = unsafe { USER_STACK[cur_app].as_ptr_range() };
-	if unsafe { 
+	if unsafe {
 		(app_range.contains(&buf) && app_range.contains(&buf.add(len))) ||
 		(app_stack_range.contains(&buf) && app_stack_range.contains(&buf.add(len)))
 	} {

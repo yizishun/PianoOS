@@ -1,14 +1,12 @@
 use crate::syscall::syscallid::SyscallID;
 use crate::arch::common::ArchTime;
-use crate::TASK_MANAGER;
 use crate::ARCH;
 use strum::IntoEnumIterator;
 use core::ops::Range;
-use core::ptr::null;
 use alloc::collections::BTreeMap;
 use log::trace;
 pub struct AppHartInfo {
-	pub cur_app: usize,
+	pub app_id: usize,
 	pub syscall_record: BTreeMap<SyscallID, usize>,
 	pub app_range: Range<*const u8>,
 	pub kernel_time: StopWatch,
@@ -16,15 +14,23 @@ pub struct AppHartInfo {
 }
 
 impl AppHartInfo {
-	pub fn new(app_id: usize, start_addr: usize, end_addr: usize) -> Self {
+	pub const ZERO: Self = Self {
+		app_id: 0,
+		syscall_record: BTreeMap::new(),
+		app_range: 0 as *const u8..0 as *const u8,
+		kernel_time: StopWatch::new(),
+		user_time: StopWatch::new(),
+	};
+
+	pub fn new(app_id: usize, app_range: Range<*const u8>) -> Self {
 		let mut record = BTreeMap::new();
 		for syscall in SyscallID::iter() {
 			record.insert(syscall, 0);
 		}
 		AppHartInfo {
-			cur_app: app_id, 
+			app_id: app_id,
 			syscall_record: record,
-			app_range: start_addr as *const u8..end_addr as *const u8,
+			app_range,
 			kernel_time: StopWatch::new(),
 			user_time: StopWatch::new(),
 		}
@@ -35,14 +41,14 @@ impl AppHartInfo {
 	}
 
 	pub fn print_app_statistics(&self) {
-		trace!("==== App({}) statistics ====", self.cur_app);
+		trace!("==== App({}) statistics ====", self.app_id);
 		trace!("Start addr: 0x{:x}", self.app_range.start as usize);
 		trace!("End addr  : 0x{:x}", self.app_range.end as usize);
 		trace!("Kernel total time: {}ns", self.kernel_time.time());
 		trace!("User total time: {}ns", self.user_time.time());
 		trace!("Syscall statistics --");
 		self.print_syscall_record();
-		trace!("== App({}) statistics end ==", self.cur_app);
+		trace!("== App({}) statistics end ==", self.app_id);
 	}
 
 	pub fn print_syscall_record(&self) {
@@ -65,8 +71,8 @@ pub struct StopWatch {
 }
 
 impl StopWatch {
-	pub fn new() -> Self {
-		Self { 
+	pub const fn new() -> Self {
+		Self {
 			total_time: 0,
 			timing: false,
 			start_time: 0,

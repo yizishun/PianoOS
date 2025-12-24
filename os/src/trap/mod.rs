@@ -54,7 +54,7 @@ impl FreeTrapStack {
 		}
 	}
 
-	pub fn kstack_ptr(self) -> usize {
+	pub fn kstack_ptr(&self) -> usize {
 		self.0.as_ptr() as usize
 	}
 
@@ -133,7 +133,7 @@ pub struct TrapHandler {
 	/// 快速路径函数。
 	///
 	/// 必须在初始化陷入时设置好。
-	fast_handler: FastHandler,
+	fast_handler: FastHandler, //物理地址
 	/// 可在汇编使用的临时存储。
 	///
 	/// - 在快速路径开始时暂存 a0。
@@ -141,8 +141,10 @@ pub struct TrapHandler {
 	scratch: usize,
 	/// 可以访问一些hart local，但是对于hart是全局的东西
 	pub hart: NonNull<HartContext>,
+	/// 翻译之后的context
+	pub transed_context: NonNull<FlowContext>,
 	/// 之前的sscratch
-	/// 
+	///
 	/// 为了支持嵌套trap，可能需要使用sscratch
 	/// （即他和flow_context没有什么本质的区别，都是可能破坏，所以需要保存）
 
