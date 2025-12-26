@@ -1,3 +1,6 @@
+use core::fmt::{Display, write};
+use core::fmt::Formatter;
+
 use crate::config::{APP_VIRT_ADDR, FLOW_CONTEXT_VADDR, MEMORY_END, PAGE_SIZE, TRAMPOLINE_VADDR, TRAP_HANDLER_VADDR, USER_STACK_SIZE};
 use crate::global::FRAME_ALLOCATOR;
 use crate::mm::address::{PhysAddr, PhysPageNum, VPNRange, VirtAddr};
@@ -150,6 +153,7 @@ impl AddrSpace {
 				MapPermission::R | MapPermission::W,
 			), None);
 		});
+		kernel_space.print_addr_space();
 
 		info!("kernel mapping address space build complete");
 		kernel_space
@@ -240,7 +244,7 @@ impl AddrSpace {
 			MapPermission::R | MapPermission::W | MapPermission::U
 		);
 		user_space.push(vma, None);
-		//TODO: TrapContext
+		user_space.print_addr_space();
 
 		(user_space, user_stack_va_end.0, entry_point)
 	}
@@ -251,6 +255,11 @@ impl AddrSpace {
 
 	pub fn token(&self) -> usize {
 		self.page_table.token()
+	}
+
+	pub fn print_addr_space(&self) {
+		info!("Address                      Permision  Map type");
+		self.vma.iter().for_each(|vma| info!("{}", vma));
 	}
 
 }
@@ -321,6 +330,21 @@ impl VMArea {
 	/// Unmap a single page in the VMArea
 	fn unmap_one(&mut self, pt_tree: &mut PageTableTree, vpn: VirtPageNum) {
 		pt_tree.unmap(vpn);
+	}
+
+}
+
+impl Display for VMArea {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+		write!(f, "[0x{:<10x}, 0x{:<10x}]   {}{}{}{}     {}",
+			VirtAddr::from(self.vpn_range.start).0,
+    			VirtAddr::from(self.vpn_range.end).0,
+			(if self.map_perm.contains(MapPermission::R) {"r"} else {"-"}),
+			(if self.map_perm.contains(MapPermission::W) {"w"} else {"-"}),
+			(if self.map_perm.contains(MapPermission::X) {"x"} else {"-"}),
+			(if self.map_perm.contains(MapPermission::U) {"u"} else {"-"}),
+			(if self.map_type == MapType::Framed {"Framed   "} else {"Identical"})
+		)
 	}
 }
 
