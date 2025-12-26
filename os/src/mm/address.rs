@@ -47,6 +47,16 @@ impl From<usize> for VirtPageNum {
 }
 
 impl PhysPageNum {
+	pub fn from_addr_ceil(addr: usize) -> Self {
+		let pa: PhysAddr = addr.into();
+		pa.ppn_ceil()
+	}
+
+	pub fn from_addr_floor(addr: usize) -> Self {
+		let pa: PhysAddr = addr.into();
+		pa.ppn_floor()
+	}
+
 	pub unsafe fn get_byte_array(&self) -> &'static mut [u8] {
 		let pa:PhysAddr = (*self).into();
 		unsafe {
@@ -67,6 +77,16 @@ impl PhysPageNum {
 }
 
 impl VirtPageNum {
+	pub fn from_addr_ceil(addr: usize) -> Self {
+		let va: VirtAddr = addr.into();
+		va.vpn_ceil()
+	}
+
+	pub fn from_addr_floor(addr: usize) -> Self {
+		let va: VirtAddr = addr.into();
+		va.vpn_floor()
+	}
+
 	pub fn indexes(&self) -> [usize; 3] {
 		let mut vpn = self.0;
 		let mut idx = [0usize; 3];
@@ -149,7 +169,7 @@ mod tests {
 		let vpn = VirtPageNum(0x1234_5);
 		assert_eq!(va.vpn_floor(), vpn);
 		assert_eq!(VirtAddr::from(vpn), va);
-		
+
 		// Test page offset
 		assert_eq!(PhysAddr(0x1234_5678).page_offset(), 0x678);
 		assert_eq!(VirtAddr(0x1234_5678).page_offset(), 0x678);

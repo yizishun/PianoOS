@@ -35,8 +35,10 @@ fn get_target_dir(current_dir: &Path, arch: &str) -> PathBuf {
 fn build_user(arg: &UserArg) -> Option<ExitStatus> {
 	info!("Building User");
 
-	let rustflags = 
-		"-C relocation-model=pie -C link-arg=-pie -C force-frame-pointers=yes";
+	let rustflags = "\
+		-C link-arg=-zmax-page-size=4096 \
+		-C link-arg=-zcommon-page-size=4096 \
+		-C force-frame-pointers=yes";
 
 	let arch: &str = &arg.target;
 
@@ -68,12 +70,12 @@ fn build_user(arg: &UserArg) -> Option<ExitStatus> {
 		.filter_map(|entry| entry.path().file_stem().map(|stem| stem.to_os_string()))
 		.collect();
 	let elfs_path: Vec<PathBuf> = bin_file.iter().map(|f| {
-		target_dir.join(f)	
+		target_dir.join(f)
 	}).collect();
 	let dst_elfs_path: Vec<PathBuf> = bin_file.iter_mut().map(|f| {
 		target_user_dir.join(f)
 	}).collect();
-	
+
 	// Create binary from ELF
 	info!("Copy Elf");
 	for (src_path, dst_path) in elfs_path.iter().zip(dst_elfs_path) {

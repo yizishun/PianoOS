@@ -148,9 +148,10 @@ impl TaskManager {
 		ARCH.set_next_timer_intr(TICK_MS);
 		self.tasks.get(next_app).unwrap().app_info().user_time.start();
 		let sp = TASK_MANAGER.get().unwrap().tasks[next_app].flow_context().sp;
+		let addr_space = TASK_MANAGER.get().unwrap().tasks[next_app].addr_space().token();
 		// init user stack and sret
 		unsafe {
-			<Arch as ArchTrap>::boot_entry(sp)
+			<Arch as ArchTrap>::boot_entry(sp, addr_space)
 		}
 	}
 

@@ -11,7 +11,7 @@ fn main() {
                 "loongarch64-unknown-none" => unimplemented!(),
                 _ => { println!(
                                     "
-                    Unsupported ARCH triple={}. 
+                    Unsupported ARCH triple={}.
                     Use 'riscv64gc-unknown-none-elf' or 'loongarch64-unknown-none'",
                                     arch.unwrap()
                         );
@@ -31,6 +31,8 @@ ENTRY(_start)
 
 SECTIONS
 {
+    . = 0x1000;
+    . = ALIGN(4K);
     .text : {
         *(.text.entry)
         *(.text .text.*)
@@ -45,6 +47,7 @@ SECTIONS
         *(.data .data.*)
         *(.sdata .sdata.*)
     }
+    . = ALIGN(4K);
     .bss : {
         start_bss = .;
         *(.bss .bss.*)

@@ -1,13 +1,14 @@
+use core::intrinsics::unreachable;
 use core::{arch::naked_asm, usize};
 use core::arch::asm;
 use riscv::register::sie;
 use riscv::register::sstatus::FS;
 use riscv::register::{sepc, sscratch, sstatus::{self, SPP}, stvec::{self, Stvec}};
 use log::{info, warn};
-use crate::config::USER_STACK_SIZE;
+use crate::config::{TRAMPOLINE_VADDR, USER_STACK_SIZE};
 use crate::harts::task_context_in_trap_stage;
 use crate::{arch::{common::ArchTrap, riscv::Riscv64}};
-use crate::USER_STACK;
+use crate::{USER_STACK, println};
 use crate::mm::stack::UserStack;
 use crate::trap::fast::FastResult;
 use crate::trap::fast::FastContext;
@@ -51,13 +52,27 @@ impl<C> ArchTrap for Riscv64<C> {
 		result
 	}
 
-	#[unsafe(naked)]
-	unsafe extern "C" fn boot_entry(a0: usize) -> ! {
-		naked_asm!(
-			".align 2",
-			"mv sp, a0",
-			"sret",
-		)
+	unsafe extern "C" fn boot_entry(a0: usize, a1: usize) -> ! {
+		//a0: user sp, a1: user addr space
+		unsafe {
+			unsafe extern "C" {
+				fn _boot_entry();
+				fn _trap_enrty();
+			}
+			let real_boot_enrty_trampoline = _boot_entry as usize - _trap_enrty as usize + TRAMPOLINE_VADDR;
+			println!("b: 0x{:x}, t: 0x{:x}, tram: 0x{:x}, r: 0x{:x}", _boot_entry as usize, _trap_enrty as usize, TRAMPOLINE_VADDR, real_boot_enrty_trampoline);
+			asm!(
+				"fence.i",
+				"mv a0, {user_sp}",
+				"mv a1, {user_addr_space}",
+				"jr {real_entry}",
+				user_sp = in(reg) a0,
+				user_addr_space = in(reg) a1,
+				real_entry = in(reg) real_boot_enrty_trampoline
+			);
+			unreachable();
+		}
+
 	}
 
 	extern "C" fn boot_handler(entry: usize, trampoline: usize, utraph: usize) {
@@ -279,7 +294,21 @@ impl FlowContext {
 }
 
 #[unsafe(naked)]
-#[unsafe(link_section = ".text.trampoline")]
+#[unsafe(export_name = "_boot_entry")]
+#[unsafe(link_section = ".text.trampoline.boot")]
+pub unsafe extern "C" fn boot_entry(a0: usize, a1: usize) -> ! {
+	naked_asm!(
+		".align 2",
+		"mv sp, a0",
+		"csrw satp, a1",
+		"sfence.vma",
+		"sret",
+	)
+}
+
+#[unsafe(naked)]
+#[unsafe(export_name = "_trap_enrty")]
+#[unsafe(link_section = ".text.trampoline.trap")]
 pub unsafe extern "C" fn trap_entry() {
 	core::arch::naked_asm!(
 		".align 2",

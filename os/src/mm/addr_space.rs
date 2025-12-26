@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 use elf::abi::{ET_DYN, PF_R, PF_W, PF_X};
 use crate::mm::address::VirtPageNum;
 use bitflags::bitflags;
-use log::info;
+use log::{debug, info};
 use crate::{global::*, println};
 use elf::{
 	ElfBytes,
@@ -75,7 +75,7 @@ impl AddrSpace {
 	pub fn insert_uflow_context(&mut self, flow: PhysAddr) -> VirtAddr {
 		//TODO: check flow is aligned
 		self.page_table.map(
-			FLOW_CONTEXT_VADDR.into(),
+			VirtPageNum::from_addr_floor(FLOW_CONTEXT_VADDR),
 			flow.ppn_floor(),
 			PTEFlags::R | PTEFlags::W,
 			None
@@ -86,7 +86,7 @@ impl AddrSpace {
 	pub fn insert_utrap_handler(&mut self, traph: PhysAddr) -> VirtAddr {
 		//TODO: check traph is aligned
 		self.page_table.map(
-			TRAP_HANDLER_VADDR.into(),
+			VirtPageNum::from_addr_floor(TRAP_HANDLER_VADDR),
 			traph.ppn_floor(),
 			PTEFlags::R | PTEFlags::W,
 			None
@@ -99,7 +99,7 @@ impl AddrSpace {
 		let mut kernel_space = Self::new_bare();
 		print_kernel_mem();
 		// trampoline
-		kernel_space.map_trampoline(TRAMPOLINE_VADDR.into());
+		kernel_space.map_trampoline(VirtPageNum::from_addr_floor(TRAMPOLINE_VADDR));
 
 		// .text
 		kernel_space.push(VMArea::new(
@@ -157,9 +157,11 @@ impl AddrSpace {
 
 	pub fn map_trampoline(&mut self, vpn: VirtPageNum) {
 		// we dont need vma because we dont use FrameAllocator
+		let ppn = PhysPageNum::from_addr_floor(&raw const strampoline as usize);
+		println!("vpn: 0x{:x}, ppn: 0x{:x}", vpn.0, ppn.0);
 		self.page_table.map(
 			vpn,
-			(&raw const strampoline as usize).into(),
+			ppn,
 			PTEFlags::R | PTEFlags::X,
 			None,
 		);
@@ -171,7 +173,7 @@ impl AddrSpace {
 		let mut user_space = Self::new_bare();
 
 		// trampoline
-		user_space.map_trampoline(TRAMPOLINE_VADDR.into());
+		user_space.map_trampoline(VirtPageNum::from_addr_floor(TRAMPOLINE_VADDR));
 
 		// parse elf into ElfBytes
 		let file = ElfBytes::<AnyEndian>::minimal_parse(elf_data).unwrap();
@@ -245,6 +247,10 @@ impl AddrSpace {
 
 	pub fn activate(&self) {
 		self.page_table.activate_token();
+	}
+
+	pub fn token(&self) -> usize {
+		self.page_table.token()
 	}
 
 }

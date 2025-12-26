@@ -56,7 +56,7 @@ pub trait ArchTrap {
 		a7: usize,
 	) -> FastResult;
 	// app boot entry
-	unsafe extern "C" fn boot_entry(a0: usize) -> !;
+	unsafe extern "C" fn boot_entry(a0: usize, a1: usize) -> !;
 	// app boot prepare
 	extern "C" fn boot_handler(entry: usize, trampoline: usize, utraph: usize);
 }
