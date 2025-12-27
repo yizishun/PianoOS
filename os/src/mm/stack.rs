@@ -6,7 +6,7 @@ use riscv::interrupt::Trap;
 use core::alloc::Layout;
 
 use crate::arch::common::{ArchHarts, ArchPower, ArchTrap, FlowContext};
-use crate::global::ARCH;
+use crate::global::{ARCH, sbss};
 use crate::arch::common::Arch;
 use crate::{harts::HartContext, config::{USER_STACK_SIZE, KERNEL_STACK_SIZE}};
 use crate::trap::{FreeTrapStack, LoadedTrapStack, TrapHandler};
@@ -24,13 +24,13 @@ pub struct UserStack([u8; USER_STACK_SIZE]);
 
 impl UserStack {
     	pub const ZERO: Self = Self([0; USER_STACK_SIZE]);
-	
+
 	pub fn as_ptr_range(&self) -> core::ops::Range<*const u8>{
 		self.0.as_ptr_range()
 	}
 }
 
-#[repr(C, align(128))]
+#[repr(C, align(4096))]
 pub struct KernelStack([u8; KERNEL_STACK_SIZE]);
 
 //                      Stack
@@ -55,6 +55,14 @@ impl KernelStack {
 		self.0.as_ptr_range()
 	}
 
+	pub fn traph(&self) -> &TrapHandler {
+		unsafe {
+			&*(self.as_ptr_range().start
+				.byte_add(Self::hart_context_size() + Self::stack_space_size())
+				as *const TrapHandler)
+			}
+	}
+
 	/// get hart context size
 	pub const fn hart_context_size() -> usize {
 		size_of::<HartContext>()
@@ -75,14 +83,14 @@ impl KernelStack {
 	pub unsafe fn current_stack() -> &'static Self {
 		let scratch = ARCH.get_scratch();
 		let stack_space_ptr = scratch as *const u8;
-		let stack_ptr = unsafe { 
+		let stack_ptr = unsafe {
 			stack_space_ptr.byte_sub(
 				Self::stack_space_size() + Self::hart_context_size())
 		};
 		unsafe {
 			& *stack_ptr.cast()
 		}
-		
+
 	}
 
 	/// get current Stack mut struct
@@ -90,14 +98,14 @@ impl KernelStack {
 	pub unsafe fn current_stack_mut() -> &'static mut Self {
 		let scratch = ARCH.get_scratch();
 		let stack_space_ptr = scratch as *mut u8;
-		let stack_ptr = unsafe { 
+		let stack_ptr = unsafe {
 			stack_space_ptr.byte_sub(
 				Self::stack_space_size() + Self::hart_context_size())
 		};
 		unsafe {
 			&mut *stack_ptr.cast()
 		}
-		
+
 	}
 
     	/// get mut hartContext in stack
@@ -111,23 +119,22 @@ impl KernelStack {
     	}
 
 	pub fn init_trap_stack(
-		&'static mut self, 
-		hartid: usize, 
-		flow_context: NonNull<FlowContext>, 
+		&'static mut self,
+		flow_context: NonNull<FlowContext>,
+		hart_context_va: NonNull<HartContext>,
+		hart_context: HartContext,
 		fast_handler: FastHandler,
 		drop: fn(Range<usize>),
 	) -> FreeTrapStack{
-		let hart_context = self.hart_context_mut();
-		let context_ptr = flow_context;
-		let hart_ptr = unsafe { NonNull::new_unchecked(hart_context) };
-		hart_context.init(hartid);
+		let hart_ctx = self.hart_context_mut();
+		*hart_ctx = hart_context;
 
 		let range = self.0.as_ptr_range();
 		FreeTrapStack::new(
-			range.start as usize.. range.end as usize, 
-			drop, 
-			context_ptr,
-			hart_ptr,
+			range.start as usize.. range.end as usize,
+			drop,
+			flow_context,
+			hart_context_va,
 			fast_handler
 		).unwrap()
 	}
@@ -136,25 +143,24 @@ impl KernelStack {
     	/// - Sets up hart context.
     	/// - Creates and loads FreeTrapStack with the stack range.
     	pub fn load_as_stack(
-		&'static mut self, 
-		hartid: usize, 
-		flow_context: NonNull<FlowContext>, 
+		&'static mut self,
+		flow_context: NonNull<FlowContext>,
+		hart_context_va: NonNull<HartContext>,
+		hart_context: HartContext,
 		fast_handler: FastHandler,
 		drop: fn(Range<usize>),
 	) -> LoadedTrapStack {
-		let hart_context = self.hart_context_mut();
-		let context_ptr = flow_context;
-		let hart_ptr = unsafe { NonNull::new_unchecked(hart_context) };
-		hart_context.init(hartid);
+		let hart_ctx = self.hart_context_mut();
+		*hart_ctx = hart_context;
 
 		let range = self.0.as_ptr_range();
-			FreeTrapStack::new(
-				range.start as usize.. range.end as usize, 
-				drop,
-				context_ptr,
-				hart_ptr,
-				fast_handler
-			).unwrap().load()
+		FreeTrapStack::new(
+			range.start as usize.. range.end as usize,
+			drop,
+			flow_context,
+			hart_context_va,
+			fast_handler
+		).unwrap().load()
 	}
 }
 

@@ -2,6 +2,7 @@ pub mod entire;
 pub mod fast;
 
 use fast::*;
+use log::info;
 use crate::arch::common::{
 	FlowContext,
 	ArchHarts
@@ -47,7 +48,9 @@ impl FreeTrapStack {
 			handler.drop = drop;
 			handler.context = context_ptr;
 			handler.hart = hart_ptr;
+			info!("fast 0x{:p}", fast_handler);
 			handler.fast_handler = fast_handler;
+			info!("fast2 0x{:p}", handler.fast_handler);
 			Ok(Self(unsafe { NonNull::new_unchecked(handler) }))
 		} else {
 			Err(IllegalStack)

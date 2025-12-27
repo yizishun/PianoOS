@@ -6,10 +6,11 @@ use core::array;
 use log::info;
 use spin::mutex::Mutex;
 
-use crate::global::{ARCH, ELFS_INFO, KERNEL_STACK, TASK_MANAGER};
+use crate::global::{ARCH, ELFS_INFO, KERNEL_ADDRSPACE, KERNEL_STACK, TASK_MANAGER};
 use crate::arch::common::{Arch, ArchPower, ArchTime, ArchTrap, FlowContext};
-use crate::config::{FLOW_CONTEXT_VADDR, MAX_APP_NUM, TICK_MS, TRAMPOLINE_VADDR, TRAP_HANDLER_VADDR};
-use crate::harts::{task_context_in_trap_stage, trap_handler_in_trap_stage};
+use crate::config::{FLOW_CONTEXT_VADDR, HART_CONTEXT_VADDR, MAX_APP_NUM, PAGE_SIZE, PAGE_SIZE_BITS, TICK_MS, TRAMPOLINE_VADDR, TRAP_HANDLER_VADDR};
+use crate::harts::{HartContext, task_context_in_trap_stage, trap_handler_in_trap_stage};
+use crate::mm::stack::KernelStack;
 use crate::task::block::TaskControlBlock;
 use crate::task::status::{ReadyLevel, TaskStatus};
 
@@ -118,27 +119,49 @@ impl TaskManager {
 		let next_flow_context_va = unsafe {
 			NonNull::new_unchecked(FLOW_CONTEXT_VADDR as *mut _)
 		};
+		let hart_context_va = unsafe {
+			NonNull::new_unchecked(HART_CONTEXT_VADDR as *mut _)
+		};
 
 		// link kernel stack to user app
+		let mut hart_context = HartContext::new();
+		#[allow(static_mut_refs)]
+		hart_context.init(
+			hartid,
+			KERNEL_ADDRSPACE.get().unwrap().token(),
+			unsafe { KERNEL_STACK.get(hartid).unwrap().traph() as *const _ as usize }
+		);
 		let kstack = unsafe {
 			#[allow(static_mut_refs)]
 			KERNEL_STACK.get_mut(hartid).unwrap()
 				.init_trap_stack(
-					hartid,
 					next_flow_context_va,
+					hart_context_va,
+					hart_context,
 					<Arch as ArchTrap>::fast_handler_user,
 					|_| {}
 				)
 		};
 
-		// link user app to kernel stack(traph)
+		// link user app to kernel stack(traph), i.e. map some kernel staff
 		//map traph
-		next_tcb.addr_space().insert_utrap_handler((*&kstack).kstack_ptr().into());
+		next_tcb
+			.addr_space()
+			.insert_utrap_handler((*&kstack).kstack_ptr().into());
+		//map kernel context(hart context)
+		#[allow(static_mut_refs)]
+		next_tcb
+			.addr_space()
+			.insert_uhart_context((unsafe{
+				KERNEL_STACK.get_mut(hartid).unwrap().as_ptr_range().start as usize
+			}).into());
+		// traph not align to 4k, so we should find the offset of traph
+		let offset = (*&kstack).kstack_ptr() & (PAGE_SIZE - 1);
 		// init sepc, sstatus, stvec, stie, sscratch
 		<Arch as ArchTrap>::boot_handler(
 			next_tcb.flow_context().pc,
 			TRAMPOLINE_VADDR,
-			TRAP_HANDLER_VADDR, //TODO: use kstack translated result
+			TRAP_HANDLER_VADDR + offset,
 		);
 		forget(kstack);
 		next_app

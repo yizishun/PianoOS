@@ -20,8 +20,14 @@ pub struct HartContext {
 }
 
 impl HartContext {
-	pub fn init(&mut self, hartid: usize){
+	pub fn new() -> Self {
+		HartContext { hartid: 0, kaddr_space: 0, ksp: 0 }
+	}
+
+	pub fn init(&mut self, hartid: usize, kaddr_space: usize, ksp: usize){
 		self.hartid = hartid;
+		self.kaddr_space = kaddr_space;
+		self.ksp = ksp;
 	}
 
 	pub fn get_hartnum() -> usize {

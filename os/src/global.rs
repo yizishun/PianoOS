@@ -41,6 +41,7 @@ pub static ELFS_INFO: Once<ElfsInfo> = Once::new();
 
 pub static FRAME_ALLOCATOR: Once<FrameAllocator> = Once::new();
 
+//TODO: support muti-harts
 pub static KERNEL_ADDRSPACE: Once<AddrSpace> = Once::new();
 
 #[unsafe(link_section = ".bss.kstack")]

@@ -1,7 +1,7 @@
 use core::fmt::{Display, write};
 use core::fmt::Formatter;
 
-use crate::config::{APP_VIRT_ADDR, FLOW_CONTEXT_VADDR, MEMORY_END, PAGE_SIZE, TRAMPOLINE_VADDR, TRAP_HANDLER_VADDR, USER_STACK_SIZE};
+use crate::config::{APP_VIRT_ADDR, FLOW_CONTEXT_VADDR, HART_CONTEXT_VADDR, MEMORY_END, PAGE_SIZE, TRAMPOLINE_VADDR, TRAP_HANDLER_VADDR, USER_STACK_SIZE};
 use crate::global::FRAME_ALLOCATOR;
 use crate::mm::address::{PhysAddr, PhysPageNum, VPNRange, VirtAddr};
 use crate::mm::page_table::{PTEFlags, PageTableTree};
@@ -91,6 +91,17 @@ impl AddrSpace {
 		self.page_table.map(
 			VirtPageNum::from_addr_floor(TRAP_HANDLER_VADDR),
 			traph.ppn_floor(),
+			PTEFlags::R | PTEFlags::W,
+			None
+		);
+		TRAP_HANDLER_VADDR.into()
+	}
+
+	pub fn insert_uhart_context(&mut self, hc: PhysAddr) -> VirtAddr {
+		//TODO: check hc is aligned
+		self.page_table.map(
+			VirtPageNum::from_addr_floor(HART_CONTEXT_VADDR),
+			hc.ppn_floor(),
 			PTEFlags::R | PTEFlags::W,
 			None
 		);
