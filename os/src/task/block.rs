@@ -4,6 +4,7 @@ use core::cell::SyncUnsafeCell;
 use log::debug;
 
 use crate::arch::common::FlowContext;
+use crate::config::TRAP_HANDLER_VADDR;
 use crate::global::TASK_MANAGER;
 use crate::mm::addr_space::AddrSpace;
 use crate::task::status::ReadyLevel;
@@ -39,7 +40,12 @@ impl TaskControlBlock {
 		} else {
 			let (u_addr_space, u_sp, u_entry) = AddrSpace::from_elf(elf_data.unwrap());
 			let app_info = SyncUnsafeCell::new(AppHartInfo::new(app_id, elf_data.unwrap().as_ptr_range()));
-			let flow_context= SyncUnsafeCell::new(FlowContext::new(u_sp, u_entry, app_id));
+			let flow_context= SyncUnsafeCell::new(FlowContext::new(
+				u_sp,
+				u_entry,
+				app_id,
+				u_addr_space.token(),
+				0)); //utrah will be set in link with hart place
 			Self {
 				flow_context, //lack utraph
 				task_status,

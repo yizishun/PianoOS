@@ -163,6 +163,7 @@ impl TaskManager {
 			TRAMPOLINE_VADDR,
 			TRAP_HANDLER_VADDR + offset,
 		);
+		self.tasks[next_app].flow_context().utrap_handler = TRAP_HANDLER_VADDR + offset;
 		forget(kstack);
 		next_app
 	}
