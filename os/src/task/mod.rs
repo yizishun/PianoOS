@@ -223,4 +223,9 @@ impl TaskManager {
 		assert!(new_task_block.status() == TaskStatus::Running);
 		info!("Kernel suspend {} switch to app {}", app_id, next_app);
 	}
+
+	pub fn task(&self, app_id: usize) -> &TaskControlBlock {
+		// check the app_id?
+		&self.tasks[app_id]
+	}
 }

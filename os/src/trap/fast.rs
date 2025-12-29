@@ -2,6 +2,7 @@
 use riscv::register::mstatus::set_fs;
 
 use crate::arch::riscv::trap::trap_end;
+use crate::global::sbss;
 use crate::harts::{HartContext, task_context_in_trap_stage};
 use crate::task::block::TaskControlBlock;
 use crate::trap::TrapHandler;
@@ -36,16 +37,26 @@ impl FastContext {
 		self.0.scratch
 	}
 
+	#[inline]
+	pub fn set_trans_context(&mut self, t: NonNull<FlowContext>) {
+		self.0.transed_context = t;
+	}
+
+	#[inline]
+	pub fn app_id(&self) -> usize {
+		self.0.app_id
+	}
+
 	/// 获取控制流上下文。
 	#[inline]
 	pub fn regs(&mut self) -> &mut FlowContext {
-		unsafe { self.0.context.as_mut() }
+		unsafe { self.0.transed_context.as_mut() }
 	}
 
 	#[inline]
 	pub fn tasks(&mut self) -> &mut TaskControlBlock {
 		unsafe {
-			(self.0.context.as_mut() as *mut FlowContext as *mut TaskControlBlock).as_mut().unwrap()
+			(self.0.transed_context.as_mut() as *mut FlowContext as *mut TaskControlBlock).as_mut().unwrap()
 		}
 	}
 

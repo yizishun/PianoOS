@@ -45,7 +45,11 @@ pub extern "C" fn fast_handler_user(
 	let save_regs = |ctx: &mut FastContext| {
 		ctx.regs().a = [ctx.a0(), a1, a2, a3, a4, a5, a6, a7];
 	};
-	//TODO: translate ctx to get the real ctx
+	let app_id = ctx.app_id();
+	let trans_ctx = unsafe {
+	    NonNull::new_unchecked(TASK_MANAGER.get().unwrap().task(app_id).flow_context())
+	};
+	ctx.set_trans_context(trans_ctx);
 	ctx.tasks().app_info().user_time.end();
 	ctx.tasks().app_info().kernel_time.start();
 

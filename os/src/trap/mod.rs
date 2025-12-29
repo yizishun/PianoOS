@@ -132,20 +132,22 @@ pub struct TrapHandler {
 	///
 	/// - 发生陷入时，将寄存器保存到此对象。
 	/// - 离开陷入处理时，按此对象的内容设置寄存器。
-	pub context: NonNull<FlowContext>,
+	pub context: NonNull<FlowContext>, //virt
 	/// 快速路径函数。
 	///
 	/// 必须在初始化陷入时设置好。
-	fast_handler: FastHandler, //物理地址
+	fast_handler: FastHandler, //phy
 	/// 可在汇编使用的临时存储。
 	///
 	/// - 在快速路径开始时暂存 a0。
 	/// - 在快速路径结束时保存完整路径函数。
 	scratch: usize,
 	/// 可以访问一些hart local，但是对于hart是全局的东西
-	pub hart: NonNull<HartContext>,
+	pub hart: NonNull<HartContext>, //virt
 	/// 翻译之后的context
-	pub transed_context: NonNull<FlowContext>,
+	pub transed_context: NonNull<FlowContext>, //phy
+	/// app_id
+	pub app_id: usize,
 	/// 之前的sscratch
 	///
 	/// 为了支持嵌套trap，可能需要使用sscratch

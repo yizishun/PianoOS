@@ -39,7 +39,7 @@ impl TaskControlBlock {
 		} else {
 			let (u_addr_space, u_sp, u_entry) = AddrSpace::from_elf(elf_data.unwrap());
 			let app_info = SyncUnsafeCell::new(AppHartInfo::new(app_id, elf_data.unwrap().as_ptr_range()));
-			let flow_context= SyncUnsafeCell::new(FlowContext::new(u_sp, u_entry, u_addr_space.root().0));
+			let flow_context= SyncUnsafeCell::new(FlowContext::new(u_sp, u_entry, app_id));
 			Self {
 				flow_context, //lack utraph
 				task_status,
