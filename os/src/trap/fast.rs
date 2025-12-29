@@ -43,6 +43,11 @@ impl FastContext {
 	}
 
 	#[inline]
+	pub fn set_trans_hart(&mut self, t: NonNull<HartContext>) {
+		self.0.transed_hart = t;
+	}
+
+	#[inline]
 	pub fn app_id(&self) -> usize {
 		self.0.app_id
 	}

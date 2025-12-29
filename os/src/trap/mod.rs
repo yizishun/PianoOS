@@ -146,8 +146,12 @@ pub struct TrapHandler {
 	pub hart: NonNull<HartContext>, //virt
 	/// 翻译之后的context
 	pub transed_context: NonNull<FlowContext>, //phy
+	// not use until
+	pub transed_hart: NonNull<HartContext>, //phy
 	/// app_id
 	pub app_id: usize,
+	/// hart_id
+	pub hart_id: usize,
 	/// 之前的sscratch
 	///
 	/// 为了支持嵌套trap，可能需要使用sscratch

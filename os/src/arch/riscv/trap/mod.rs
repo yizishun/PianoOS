@@ -13,7 +13,6 @@ use crate::mm::stack::UserStack;
 use crate::trap::fast::FastResult;
 use crate::trap::fast::FastContext;
 use crate::trap::LoadedTrapStack;
-use crate::harts::hart_context_in_trap_stage;
 pub mod handler;
 
 impl<C> ArchTrap for Riscv64<C> {
@@ -327,12 +326,16 @@ pub unsafe extern "C" fn trap_entry() {
 		save!(tp => a0[29]), //tp存放原sscratch值，在整个trap过程有效
 		// get app_id
 		load!(a0[32] => t0),
-		save!(t0 =>  sp[5]),
+		save!(t0 =>  sp[6]),
 		//如果要支持嵌套trap，需要保存可能被破坏的sscratch
 		csr_save_n!(sscratch => t0 => a0[30]),
 		csr_save_n!(sepc => t0 => a0[31]),
 		// 换内核地址空间内核栈地址
 		load!(sp[3] => t1),
+		// hart_id
+		load!(t1[0] => t2),
+		save!(t2 => sp[7]),
+		// ksp
 		load!(t1[2] => sp),
 		// 换地址空间
 		csr_load!(t1[1] => t2 => satp),

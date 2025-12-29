@@ -1,4 +1,4 @@
-use crate::harts::{hart_context_in_trap_stage, task_context_in_trap_stage};
+use crate::harts::{hart_id_in_trap_stage, task_context_in_trap_stage};
 use crate::println;
 use alloc::boxed::Box;
 use log::Level;
@@ -84,8 +84,7 @@ impl Log for TrapLogger {
 		};
 		let ansi_reset = "\x1b[0m";
 		let bold = "\x1b[1;37m";
-		let hart_context = hart_context_in_trap_stage();
-		let hart_id = hart_context.hartid();
+		let hart_id = hart_id_in_trap_stage();
 		let app_id = task_context_in_trap_stage().app_info().app_id;
 		println!("{bold}[kernel]{reset}{color_log} {:<5}[{:>2}][{:>2}]{reset} - {}",
 			 record.level(),

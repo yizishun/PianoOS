@@ -55,14 +55,13 @@ pub fn hart_context_in_boot_stage() -> &'static mut HartContext {
 	}
 }
 
-pub fn hart_context_in_trap_stage() -> &'static mut HartContext {
+pub fn hart_id_in_trap_stage() -> usize {
 	let mut scratch: *mut TrapHandler;
 	unsafe {
 		asm!("mv {}, tp", out(reg) scratch);
 	}
-	let mut hart_context = unsafe { (*scratch).hart };
 	unsafe {
-		hart_context.as_mut()
+		(*scratch).hart_id
 	}
 }
 
@@ -79,7 +78,7 @@ pub fn task_context_in_trap_stage() -> &'static mut TaskControlBlock {
 	unsafe {
 		asm!("mv {}, tp", out(reg) scratch);
 	}
-	let task_block = unsafe { (*scratch).context.as_ptr() as *mut TaskControlBlock };
+	let task_block = unsafe { (*scratch).transed_context.as_ptr() as *mut TaskControlBlock };
 	unsafe {
 		task_block.as_mut().unwrap()
 	}

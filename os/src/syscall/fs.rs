@@ -3,19 +3,25 @@ use core::{slice::from_raw_parts, str::from_utf8};
 use alloc::task;
 use log::warn;
 
-use crate::{global::{TASK_MANAGER, USER_STACK}, harts::{hart_context_in_trap_stage, task_context_in_trap_stage}, print};
+use crate::{global::{TASK_MANAGER, USER_STACK}, harts::{task_context_in_trap_stage}, print};
 
 const FD_STDOUT: usize = 1;
 
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
-	if !check_buf_valid(buf, len) {
-		return -1;
-	}
+	let addr_space = task_context_in_trap_stage()
+		.addr_space();
+	let phy_buf = addr_space
+		.translated_byte_buffer(buf, len);
+	// TODO: check
+//	if !check_buf_valid(buf, len) {
+//		return -1;
+//	}
 	match fd {
 		FD_STDOUT => {
-			let slice = unsafe { from_raw_parts(buf, len) };
-			let str = from_utf8(slice).unwrap();
-			print!("{}", str);
+			for buf in phy_buf {
+				let str = from_utf8(buf).unwrap();
+				print!("{}", str);
+			}
 			len as isize
 		}
 		_ => {

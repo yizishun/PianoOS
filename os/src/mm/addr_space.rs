@@ -1,5 +1,7 @@
 use core::fmt::{Display, write};
 use core::fmt::Formatter;
+use core::ops::Range;
+use core::iter::Step;
 
 use crate::config::{APP_VIRT_ADDR, FLOW_CONTEXT_VADDR, HART_CONTEXT_VADDR, MEMORY_END, PAGE_SIZE, TRAMPOLINE_VADDR, TRAP_HANDLER_VADDR, USER_STACK_SIZE};
 use crate::global::FRAME_ALLOCATOR;
@@ -266,6 +268,38 @@ impl AddrSpace {
 
 	pub fn token(&self) -> usize {
 		self.page_table.token()
+	}
+
+	pub fn translated_byte_buffer(
+		&self,
+		ptr: *const u8,
+		len: usize
+	) -> Vec<&'static [u8]> {
+		let start_va: VirtAddr = (ptr as usize).into();
+		let start_vpn: VirtPageNum = start_va.vpn_floor();
+		let end_va: VirtAddr = (ptr as usize + len).into();
+		let end_vpn: VirtPageNum = end_va.vpn_ceil(); //.. not include end_vpn
+
+		(start_vpn..end_vpn).map(|vpn| {
+			let start_offset = if vpn == start_vpn {
+				start_va.page_offset()
+			} else {
+				0
+			};
+			let step_next = VirtPageNum::forward_checked(vpn, 1).unwrap();
+			let end_offset = if step_next == end_vpn {
+				end_va.page_offset()
+			} else {
+				PAGE_SIZE
+			};
+
+			let ppn = self.page_table
+				.translate_vpn(vpn)
+				.unwrap(); //TODO: check the len and buf(may come from user space)
+			unsafe {
+				&ppn.get_byte_array()[start_offset..end_offset]
+			}
+		}).collect()
 	}
 
 	pub fn print_addr_space(&self) {
