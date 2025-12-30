@@ -1,7 +1,7 @@
 #[derive(Copy, Clone, PartialEq, PartialOrd)]
 pub enum ReadyLevel {
 	Low,
-	High	
+	High
 }
 
 
@@ -13,8 +13,19 @@ pub enum TaskStatus {
 	Exited,
 }
 
+impl TaskStatus {
+	pub fn get_priority(&self) -> Option<u8> {
+		match self {
+		    TaskStatus::UnInit => Some(255),
+		    TaskStatus::Ready(ReadyLevel::High) => Some(2),
+		    TaskStatus::Ready(ReadyLevel::Low) => Some(3),
+		    _ => None
+		}
+	}
+}
+
 impl From<TaskStatus> for u8 {
-    	#[inline] fn from(s: TaskStatus) -> u8 { 
+    	#[inline] fn from(s: TaskStatus) -> u8 {
 		match s {
 		    TaskStatus::UnInit => 0,
 		    TaskStatus::Running => 1,

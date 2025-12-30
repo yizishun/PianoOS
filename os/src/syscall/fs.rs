@@ -10,8 +10,9 @@ const FD_STDOUT: usize = 1;
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
 	let addr_space = task_context_in_trap_stage()
 		.addr_space();
-	let phy_buf = addr_space
-		.translated_byte_buffer(buf, len);
+	let Some(phy_buf) = addr_space.translated_byte_buffer(buf, len) else {
+        	return -1;
+    	};
 	// TODO: check
 //	if !check_buf_valid(buf, len) {
 //		return -1;

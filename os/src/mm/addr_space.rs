@@ -88,10 +88,13 @@ impl AddrSpace {
 		FLOW_CONTEXT_VADDR.into()
 	}
 
-	pub fn insert_utrap_handler(&mut self, traph: PhysAddr) -> VirtAddr {
-		//TODO: check traph is aligned
+	pub fn insert_utrap_handler(&mut self, traph: PhysAddr, unmap: bool) -> VirtAddr {
+		let utraph_vpn = VirtPageNum::from_addr_floor(TRAP_HANDLER_VADDR);
+		if unmap {
+			self.page_table.unmap(utraph_vpn);
+		}
 		self.page_table.map(
-			VirtPageNum::from_addr_floor(TRAP_HANDLER_VADDR),
+			utraph_vpn,
 			traph.ppn_floor(),
 			PTEFlags::R | PTEFlags::W,
 			None
@@ -99,10 +102,14 @@ impl AddrSpace {
 		TRAP_HANDLER_VADDR.into()
 	}
 
-	pub fn insert_uhart_context(&mut self, hc: PhysAddr) -> VirtAddr {
+	pub fn insert_uhart_context(&mut self, hc: PhysAddr, unmap: bool) -> VirtAddr {
 		//TODO: check hc is aligned
+		let uhc_vpn = VirtPageNum::from_addr_floor(HART_CONTEXT_VADDR);
+		if unmap {
+			self.page_table.unmap(uhc_vpn);
+		}
 		self.page_table.map(
-			VirtPageNum::from_addr_floor(HART_CONTEXT_VADDR),
+			uhc_vpn,
 			hc.ppn_floor(),
 			PTEFlags::R | PTEFlags::W,
 			None
@@ -274,7 +281,7 @@ impl AddrSpace {
 		&self,
 		ptr: *const u8,
 		len: usize
-	) -> Vec<&'static [u8]> {
+	) -> Option<Vec<&'static [u8]>> {
 		let start_va: VirtAddr = (ptr as usize).into();
 		let start_vpn: VirtPageNum = start_va.vpn_floor();
 		let end_va: VirtAddr = (ptr as usize + len).into();
@@ -294,11 +301,10 @@ impl AddrSpace {
 			};
 
 			let ppn = self.page_table
-				.translate_vpn(vpn)
-				.unwrap(); //TODO: check the len and buf(may come from user space)
-			unsafe {
+				.translate_vpn(vpn)?;
+			Some(unsafe {
 				&ppn.get_byte_array()[start_offset..end_offset]
-			}
+			})
 		}).collect()
 	}
 

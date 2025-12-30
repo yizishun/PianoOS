@@ -1,10 +1,7 @@
 use crate::TASK_MANAGER;
-use crate::arch::riscv::trap::trap_end;
 use crate::config::TICK_MS;
 use crate::global::ARCH;
 use crate::arch::common::ArchTime;
-use crate::global::KERNEL_STACK;
-use crate::println;
 use crate::syscall::syscall;
 use crate::syscall::syscallid::SyscallID;
 use crate::trap::entire::EntireContext;
@@ -12,8 +9,6 @@ use crate::trap::entire::EntireResult;
 use crate::trap::fast::FastResult;
 use crate::trap::fast::FastContext;
 use crate::arch::common::ArchTrap;
-use crate::harts::task_context_in_trap_stage;
-use crate::trap::LoadedTrapStack;
 use crate::mm::stack::KernelStack;
 use crate::config::{KERNEL_STACK_ALIGN, KERNEL_STACK_SIZE};
 use crate::{mm::stack::stack_drop};
@@ -216,24 +211,33 @@ pub extern "C" fn syscall_handler(
 
 pub extern "C" fn yield_handler(ctx: EntireContext) -> EntireResult {
 	let mut split_ctx = ctx.split().0;
-	if cfg!(feature = "nested_trap") {
-		let sepc = split_ctx.regs().pc;
-		split_ctx.regs().set_pc(sepc + 4);
-	} else {
-		split_ctx.regs().set_sp(sscratch::read());
-		split_ctx.regs().set_pc(sepc::read() + 4);
-	}
-	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next();
+	let (pc, sp) = {
+		#[cfg(feature = "nested_trap")]
+		{
+			(Some(split_ctx.regs().pc + 4), None)
+		}
+		#[cfg(not(feature = "nested_trap"))]
+		{
+			(Some(sepc::read() + 4), Some(sscratch::read()))
+		}
+    	};
+	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next(sp, pc);
 	split_ctx.switch()
 }
 
 pub extern "C" fn timer_handler(ctx: EntireContext) -> EntireResult {
-	let mut split_ctx = ctx.split().0;
-	#[cfg(not(feature = "nested_trap"))] {
-		split_ctx.regs().set_sp(sscratch::read());
-		split_ctx.regs().set_pc(sepc::read());
-	}
+	let split_ctx = ctx.split().0;
+	let (pc, sp) = {
+		#[cfg(feature = "nested_trap")]
+		{
+			(None, None)
+		}
+		#[cfg(not(feature = "nested_trap"))]
+		{
+			(Some(sepc::read() + 4), Some(sscratch::read()))
+		}
+    	};
 	ARCH.set_next_timer_intr(TICK_MS);
-	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next();
+	TASK_MANAGER.get().unwrap().suspend_cur_and_run_next(sp, pc);
 	split_ctx.switch()
 }

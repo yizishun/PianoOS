@@ -1,3 +1,4 @@
+use core::cmp::Reverse;
 use core::ptr::NonNull;
 use core::sync::atomic::Ordering;
 use core::intrinsics::forget;
@@ -6,6 +7,7 @@ use core::array;
 use log::info;
 use spin::mutex::Mutex;
 
+use crate::arch::loongarch64::trap;
 use crate::global::{ARCH, ELFS_INFO, KERNEL_ADDRSPACE, KERNEL_STACK, TASK_MANAGER};
 use crate::arch::common::{Arch, ArchPower, ArchTime, ArchTrap, FlowContext};
 use crate::config::{FLOW_CONTEXT_VADDR, HART_CONTEXT_VADDR, MAX_APP_NUM, PAGE_SIZE, PAGE_SIZE_BITS, TICK_MS, TRAMPOLINE_VADDR, TRAP_HANDLER_VADDR};
@@ -35,7 +37,7 @@ impl TaskManager {
 				if i < num_app {
 					TaskControlBlock::new(
 						i,
-						TaskStatus::Ready(ReadyLevel::High),
+						TaskStatus::UnInit,
 						Some(ELFS_INFO.get().unwrap().elf_info(i))
 					)
 				} else {
@@ -79,42 +81,37 @@ impl TaskManager {
 	}
 
 	/// this will find next ready app and set running(use CAS)
-	fn find_next_ready_and_set_run(&self) -> usize {
+	/// return (prev_status, app_id)
+	/// TODO: use bitmap or queue(linux kernel does) to opt it
+	fn find_next_ready_and_set_run(&self) -> (TaskStatus, usize) {
 		loop {
-			use ReadyLevel::*;
-			let mut best_id: Option<usize> = None;
-			let mut best_level = Low;
-			for (id, task) in self.tasks.iter().enumerate() {
-				let status = TaskStatus::try_from(task.task_status.load(Ordering::Relaxed)).unwrap();
-				if let TaskStatus::Ready(level) = status {
-					if best_id.is_none() || level > best_level {
-						best_id = Some(id);
-						best_level = level;
-					}
-				}
+			let best_candidate = self.tasks.iter().enumerate()
+				.filter_map(|(id, task)| {
+					let raw = task.task_status.load(Ordering::Relaxed);
+					let status = TaskStatus::try_from(raw).ok()?;
+					let prio = status.get_priority()?;
+					Some((id, raw, status, prio))
+				}).max_by_key(|(id, _, _, prio)| (*prio, Reverse(*id)));
 
-			}
-			if let Some(id) = best_id {
+			if let Some((id, raw, status, _)) = best_candidate {
 				if self.tasks[id].task_status.compare_exchange(
-					u8::from(TaskStatus::Ready(best_level)),
+					raw,
 					u8::from(TaskStatus::Running),
 					Ordering::Acquire,
 					Ordering::Relaxed).is_ok() {
-					assert!(self.tasks[id].status() == TaskStatus::Running);
-					return id;
+						return (status, id);
+					}
+				else {
+				    self.check_end();
 				}
 			}
-			self.check_end();
 		}
 	}
 
 
 	pub fn prepare_next_at_boot(&self, hartid: usize) -> usize {
-		let next_app = self.find_next_ready_and_set_run();
+		let (prev_status, next_app) = self.find_next_ready_and_set_run();
 		let next_tcb = &self.tasks[next_app];
-		let next_flow_context = unsafe {
-			NonNull::new_unchecked((&self.tasks[next_app]).flow_context.get() as *mut _)
-		};
 		//TODO: use next_flow_context translated result
 		let next_flow_context_va = unsafe {
 			NonNull::new_unchecked(FLOW_CONTEXT_VADDR as *mut _)
@@ -123,7 +120,7 @@ impl TaskManager {
 			NonNull::new_unchecked(HART_CONTEXT_VADDR as *mut _)
 		};
 
-		// link kernel stack to user app
+		// kernel: link kernel stack to user app
 		let mut hart_context = HartContext::new();
 		#[allow(static_mut_refs)]
 		hart_context.init(
@@ -143,27 +140,29 @@ impl TaskManager {
 				)
 		};
 
-		// link user app to kernel stack(traph), i.e. map some kernel staff
+		// user: link user app to kernel stack(traph), i.e. map some kernel staff
 		//map traph
+		assert!(prev_status == TaskStatus::UnInit);
 		next_tcb
 			.addr_space()
-			.insert_utrap_handler((*&kstack).kstack_ptr().into());
+			.insert_utrap_handler((*&kstack).kstack_ptr().into(), false);
 		//map kernel context(hart context)
 		#[allow(static_mut_refs)]
 		next_tcb
 			.addr_space()
 			.insert_uhart_context((unsafe{
 				KERNEL_STACK.get_mut(hartid).unwrap().as_ptr_range().start as usize
-			}).into());
+			}).into(), false);
 		// traph not align to 4k, so we should find the offset of traph
 		let offset = (*&kstack).kstack_ptr() & (PAGE_SIZE - 1);
+		next_tcb.flow_context().utrap_handler = TRAP_HANDLER_VADDR + offset;
+
 		// init sepc, sstatus, stvec, stie, sscratch
 		<Arch as ArchTrap>::boot_handler(
 			next_tcb.flow_context().pc,
 			TRAMPOLINE_VADDR,
 			TRAP_HANDLER_VADDR + offset,
 		);
-		self.tasks[next_app].flow_context().utrap_handler = TRAP_HANDLER_VADDR + offset;
 		forget(kstack);
 		next_app
 	}
@@ -180,13 +179,41 @@ impl TaskManager {
 	}
 
 	pub fn run_next_at_trap(&self) -> usize{
-		let next_app = self.find_next_ready_and_set_run();
+		let (prev_status, next_app) = self.find_next_ready_and_set_run();
 		assert!(self.tasks[next_app].status() == TaskStatus::Running);
+		let next_tcb = &self.tasks[next_app];
 		let next_flow_context = (&self.tasks[next_app]).flow_context.get() as *mut FlowContext;
 		let trap_handler = trap_handler_in_trap_stage();
+		let hartid = trap_handler.hart_id;
 
-		// switch task context
-		trap_handler.context = unsafe { NonNull::new_unchecked(next_flow_context) };
+		// kernel: switch task context
+		trap_handler.transed_context = unsafe { NonNull::new_unchecked(next_flow_context) };
+		trap_handler.app_id = next_app;
+
+		// user: modify the map and flow_context
+		assert!(matches!(prev_status, TaskStatus::UnInit | TaskStatus::Ready(_)));
+		let is_uninit = prev_status == TaskStatus::UnInit;
+		//map traph
+		next_tcb
+			.addr_space()
+			.insert_utrap_handler((trap_handler as *const _ as usize).into(), !is_uninit);
+		//map kernel context(hart context)
+		#[allow(static_mut_refs)]
+		next_tcb
+			.addr_space()
+			.insert_uhart_context((unsafe{
+				KERNEL_STACK.get_mut(hartid).unwrap().as_ptr_range().start as usize
+			}).into(), !is_uninit);
+		// offset and utraph va is always the same
+		let offset = (trap_handler as *const _ as usize) & (PAGE_SIZE - 1);
+		if is_uninit {
+			next_tcb.flow_context().utrap_handler = TRAP_HANDLER_VADDR + offset;
+		}
+
+		// switch sscratch and sepc
+		unsafe {
+			(*next_flow_context).load_others();
+		}
 
 		assert!(self.tasks[next_app].status() == TaskStatus::Running);
 		next_app
@@ -207,12 +234,19 @@ impl TaskManager {
 		info!("Kernel end {} and switch to app {}", app_id, next_app);
 	}
 
-	pub fn suspend_cur_and_run_next(&self) {
+	pub fn suspend_cur_and_run_next(&self, sp: Option<usize>, pc: Option<usize>) {
 		let app_id = task_context_in_trap_stage().app_info().app_id;
 		let old_task_block = self.tasks.get(app_id).unwrap();
 		assert!(old_task_block.status() == TaskStatus::Running, "this task is not Running, something may be wrong");
 		old_task_block.app_info().kernel_time.end();
-		info!("Release {}", app_id);
+
+		info!("Release {}, and save the sp and pc", app_id);
+		if let Some(sp) = sp {
+			old_task_block.flow_context().set_sp(sp);
+		}
+		if let Some(pc) = pc {
+			old_task_block.flow_context().set_pc(pc);
+		}
 
 		old_task_block.mark_suspend_low();
 		let next_app = self.run_next_at_trap();

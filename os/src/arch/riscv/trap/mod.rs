@@ -553,11 +553,5 @@ pub extern "C" fn trap_end(switch: bool) {
 		task_context_in_trap_stage().app_info().kernel_time.end();
 	}
 
-	// switch should restore sp and pc
-	if switch {
-		unsafe {
-			task_context_in_trap_stage().flow_context().load_others();
-		}
-	}
 	task_context_in_trap_stage().app_info().user_time.start();
 }
